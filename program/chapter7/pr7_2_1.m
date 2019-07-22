@@ -1,11 +1,12 @@
 %
-% pr7_2_1   
+% pr7_2_1
+addpath('../basic_tbx');
 clear all; clc; close all;
 
 filedir=[];                             % 指定文件路径
-filename='bluesky1.wav';                % 指定文件名
+filename='../speech_signal/bluesky1.wav';                % 指定文件名
 fle=[filedir filename]                  % 构成路径和文件名的字符串
-[xx,fs]=wavread(fle);                   % 读入数据文件
+[xx,fs]=audioread(fle);                   % 读入数据文件
 xx=xx-mean(xx);                         % 消除直流分量
 x=xx/max(abs(xx));                      % 幅值归一化
 
@@ -25,9 +26,9 @@ output=simplesubspec(signal,wlen,inc,NIS,a,b);% 谱减
 snr2=SNR_singlech(x,output);            % 计算谱减后的信噪比
 snr=snr2-snr1;
 fprintf('snr1=%5.4f   snr2=%5.4f   snr=%5.4f\n',snr1,snr2,snr);
-wavplay(signal,fs);
+audioplayer(signal,fs);
 pause(1)
-wavplay(output,fs);
+audioplayer(output,fs);
 % 作图
 subplot 311; plot(time,x,'k'); grid; axis tight;
 title('纯语音波形'); ylabel('幅值')
