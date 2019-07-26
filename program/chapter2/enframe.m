@@ -17,6 +17,6 @@ inds = (1:len);             % 每帧数据对应1:len
 f(:) = x(indf(:,ones(1,len))+inds(ones(nf,1),:));   % 对数据分帧
 if (nwin > 1)               % 若参数中包括窗函数，把每帧乘以窗函数
     w = win(:)';            % 把win转成行数据
-    f = f .* w(ones(nf,1),:);  % 乘窗函数
+    f = f .* w(ones(nf,1),:);  % 乘窗函数, 不是卷积，是点乘(.*)
 end
 
