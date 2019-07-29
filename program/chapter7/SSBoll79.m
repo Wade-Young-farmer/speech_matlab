@@ -43,6 +43,7 @@ FreqResol=size(Y,1);
 
 N=mean(Y(:,1:NIS)')'; %initial Noise Power Spectrum mean
 NRM=zeros(size(N));% Noise Residual Maximum (Initialization)
+% The following 3 variables are newly introduced
 NoiseCounter=0;
 NoiseLength=9;%This is a smoothing factor for the noise updating
 
@@ -54,7 +55,7 @@ for i=2:(numberOfFrames-1)
 end
 
 for i=1:numberOfFrames
-    [NoiseFlag, SpeechFlag, NoiseCounter, Dist]=vad(Y(:,i).^(1/Gamma),N.^(1/Gamma),NoiseCounter); %Magnitude Spectrum Distance VAD
+    [NoiseFlag, SpeechFlag, NoiseCounter, Dist]=vad(Y(:,i).^(1/Gamma),N.^(1/Gamma),NoiseCounter); %Magnitude Spectrum Distance VAD Æ×¾àÀëµÄ¶Ëµã¼ì²â
     if SpeechFlag==0
         N=(NoiseLength*N+Y(:,i))/(NoiseLength+1); %Update and smooth noise
         NRM=max(NRM,YS(:,i)-N);%Update Maximum Noise Residue
