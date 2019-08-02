@@ -1,5 +1,6 @@
 %
 % pr7_2_3 
+addpath('../basic_tbx');
 clear all; clc; close all;
 
 filedir=[];                             % 指定文件路径
