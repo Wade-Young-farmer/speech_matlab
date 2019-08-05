@@ -1,6 +1,6 @@
 %
 % PART_I
-[xx,fs]=wavread(fle);                   % 读入数据
+[xx,fs]=audioread(fle);                   % 读入数据
 xx=xx-mean(xx);                         % 消除直流分量
 x=xx/max(abs(xx));                      % 幅值归一化
 N=length(x);                            % 取信号长度

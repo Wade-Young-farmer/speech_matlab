@@ -25,7 +25,7 @@ if nargin<3
     NoiseCounter=0;
 end
     
-FreqResol=length(signal);
+FreqResol=length(signal); % It is not functioning
 
 SpectralDist= 20*(log10(signal)-log10(noise));
 SpectralDist(find(SpectralDist<0))=0;

@@ -3,10 +3,11 @@
 clear all; clc; close all;
 
 run Set_I                               % 基本设置
-run PART_I                              % 读入数据，分帧等准备
+run PART_I
+% 读入数据，分帧等准备
 Y=fft(y);                               % FFT变换
 Y=abs(Y(1:fix(wlen/2)+1,:));            % 计算正频率幅值
-N=mean(Y(:,1:NIS),2);                   % 计算前导无话段噪声区平均频谱
+N=mean(Y(:,1:NIS),2);                   % 计算前导无话段噪声区平均频谱 不需要update?
 NoiseCounter=0;
 
 for i=1:fn, 
