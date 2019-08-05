@@ -8,12 +8,13 @@ figure(1), subplot 211; plot(time,y,'k');     % 画出信号波形
 title('信号波形'); axis([0 max(time) -0.7 0.7]);
 ylabel('幅值'); xlabel(['时间/s' 10 '(a)']); grid;
 figure(2)
-nn=1:nfft/2; ff=(nn-1)*fs/nfft;               % 计算频率刻度
+nn=1:nfft/2 + 1; ff=(nn-1)*fs/nfft;              % 计算频率刻度
 Y=log(abs(fft(y)));                           % 按式(3-1-8)取实数部分
-subplot 211; plot(ff,Y(nn),'k'); hold on;     % 画出信号的频谱图
+subplot 211; plot(ff,Y(nn),'r'); hold on;     % 画出信号的频谱图
 z=ifft(Y);                                    % 按式(3-1-8)求取倒谱
-figure(1), subplot 212; plot(time,z,'k');     % 画出倒谱图
-title('信号倒谱图'); axis([0 time(512) -0.2 0.2]); grid; 
+% 倒谱也是实信号
+figure(1), subplot 212; plot(time,z,'g');     % 画出倒谱图 
+title('信号倒谱图'); axis([0 time(1024) -0.2 0.2]); grid; 
 ylabel('幅值'); xlabel(['倒频率/s' 10 '(b)']);
 mcep=29;                                      % 分离声门激励脉冲和声道冲激响应
 zy=z(1:mcep+1);
