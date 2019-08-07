@@ -1,10 +1,5 @@
 function soundSegment=findSegment(express)
-if express(1)==0
-    voicedIndex=find(express);                     % 寻找express中为1的位置
-else
-    voicedIndex=express;
-end
-
+voicedIndex=express;
 soundSegment = [];
 k = 1;
 soundSegment(k).begin = voicedIndex(1);            % 设置第一组有话段的起始位置

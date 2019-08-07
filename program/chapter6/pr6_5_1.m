@@ -26,6 +26,7 @@ end
 sindex=find(SF==1);                     % 从SF中寻找出端点的参数完成端点检测
 voiceseg=findSegment(sindex);
 vosl=length(voiceseg);
+display(sindex, 'voiceseg');
 % 作图
 subplot 311; plot(time,x,'k'); 
 title('纯语音波形');
