@@ -28,9 +28,14 @@ end
 FreqResol=length(signal); % It is not functioning
 
 SpectralDist= 20*(log10(signal)-log10(noise));
+% 这是书里对数频谱距离的实现，但是似乎效果不好
+% temp = SpectralDist .* SpectralDist;
+% fft_len = length(SpectralDist);
+% Dist = mean(temp(1:fix(fft_len/2) + 1));
 SpectralDist(find(SpectralDist<0))=0;
+Dist=mean(SpectralDist);
+display(Dist);
 
-Dist=mean(SpectralDist); 
 if (Dist < NoiseMargin) 
     NoiseFlag=1; 
     NoiseCounter=NoiseCounter+1;
