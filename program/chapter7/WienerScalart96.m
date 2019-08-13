@@ -17,20 +17,21 @@ W=fix(.025*fs); %Window length is 25 ms
 SP=.4; %Shift percentage is 40% (10ms) %Overlap-Add method works good with this value(.4)
 wnd=hamming(W);
 if (nargin>=3 & isstruct(IS))%This option is for compatibility with another programme
-W=IS.windowsize
-SP=IS.shiftsize/W;
-%nfft=IS.nfft;
-wnd=IS.window;
-if isfield(IS,'IS')
-IS=IS.IS;
-else
-IS=.25;
-end
+    W=IS.windowsize
+    SP=IS.shiftsize/W;
+    %nfft=IS.nfft;
+    wnd=IS.window;
+    if isfield(IS,'IS')
+        IS=IS.IS;
+    else
+    IS=.25;
+    end
 end
 pre_emph=0;
-signal=filter([1 -pre_emph],1,signal);
+signal=filter([1 -pre_emph],1,signal); % 信号预加重, 但是此处相当于什么都没有做
 NIS=fix((IS*fs-W)/(SP*W) +1);%number of initial silence segments
-y=segment(signal,W,SP,wnd); % This function chops the signal into frames
+% y=segment(signal,W,SP,wnd); % This function chops the signal into frames
+y=enframe(signal,wnd,W*SP).';
 Y=fft(y);
 YPhase=angle(Y(1:fix(end/2)+1,:)); %Noisy Speech Phase
 Y=abs(Y(1:fix(end/2)+1,:));%Specrogram
@@ -46,24 +47,25 @@ Gamma=G;
 X=zeros(size(Y)); % Initialize X (memory allocation)
 h=waitbar(0,'Wait...');
 for i=1:numberOfFrames
-%%%%%%%%%%%%%%%%VAD and Noise Estimation START
-if i<=NIS % If initial silence ignore VAD
-SpeechFlag=0;
-NoiseCounter=100;
-else % Else Do VAD
-[NoiseFlag, SpeechFlag, NoiseCounter, Dist]=vad(Y(:,i),N,NoiseCounter); %Magnitude Spectrum Distance VAD
-end
-if SpeechFlag==0 % If not Speech Update Noise Parameters
-N=(NoiseLength*N+Y(:,i))/(NoiseLength+1); %Update and smooth noise mean
-LambdaD=(NoiseLength*LambdaD+(Y(:,i).^2))./(1+NoiseLength); %Update and smooth noise variance
-end
-%%%%%%%%%%%%%%%%%%%VAD and Noise Estimation END
-gammaNew=(Y(:,i).^2)./LambdaD; %A postiriori SNR
-xi=alpha*(G.^2).*Gamma+(1-alpha).*max(gammaNew-1,0); %Decision Directed Method for A Priori SNR
-Gamma=gammaNew;
-G=(xi./(xi+1));
-X(:,i)=G.*Y(:,i); %Obtain the new Cleaned value
-waitbar(i/numberOfFrames,h,num2str(fix(100*i/numberOfFrames)));
+    %%%%%%%%%%%%%%%%VAD and Noise Estimation START
+    if i<=NIS % If initial silence ignore VAD
+        SpeechFlag=0;
+        NoiseCounter=100;
+    else % Else Do VAD
+        [NoiseFlag, SpeechFlag, NoiseCounter, Dist]=vad(Y(:,i),N,NoiseCounter); %Magnitude Spectrum Distance VAD
+    end
+    
+    if SpeechFlag==0 % If not Speech Update Noise Parameters
+        N=(NoiseLength*N+Y(:,i))/(NoiseLength+1); %Update and smooth noise mean
+        LambdaD=(NoiseLength*LambdaD+(Y(:,i).^2))./(1+NoiseLength); %Update and smooth noise variance
+    end
+    %%%%%%%%%%%%%%%%%%%VAD and Noise Estimation END
+    gammaNew=(Y(:,i).^2)./LambdaD; %A postiriori SNR
+    xi=alpha*(G.^2)*Gamma+(1-alpha).*max(gammaNew-1,0); %Decision Directed Method for A Priori SNR
+    Gamma=gammaNew;
+    G=(xi./(xi+1));
+    X(:,i)=G.*Y(:,i); %Obtain the new Cleaned value
+    waitbar(i/numberOfFrames,h,num2str(fix(100*i/numberOfFrames)));
 end
 close(h);
 output=OverlapAdd2(X,YPhase,W,SP*W); %Overlap-add Synthesis of speech

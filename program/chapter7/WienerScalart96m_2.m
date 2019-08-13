@@ -30,7 +30,8 @@ end
 pre_emph=0;
 signal=filter([1 -pre_emph],1,signal);      % 预加重
 NIS=fix((IS*fs-W)/(SP*W) +1);               % 计算无话段帧数
-y=segment(signal,W,SP,wnd);                 % 分帧 
+% y=segment(signal,W,SP,wnd);                 % 分帧
+y=enframe(signal,wnd,W*SP).';
 Y=fft(y);                                   % FFT
 YPhase=angle(Y(1:fix(end/2)+1,:));          % 带噪语音的相位角 
 Y=abs(Y(1:fix(end/2)+1,:));                 % 取正频率谱值
