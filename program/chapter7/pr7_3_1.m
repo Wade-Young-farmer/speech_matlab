@@ -1,6 +1,8 @@
 %
 % pr7_3_1 
 clear all; 
+addpath('../basic_tbx');
+addpath('../chapter6');
 % clc; 
 close all;
 

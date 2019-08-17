@@ -38,7 +38,9 @@ Y=abs(Y(1:fix(end/2)+1,:));                 % 取正频率谱值
 numberOfFrames=size(Y,2);                   % 计算总帧数
 FreqResol=size(Y,1);                        % 计算频谱中的谱线数
 N=mean(Y(:,1:NIS)')';                       % 计算无话段噪声平均谱值 
-LambdaD=mean((Y(:,1:NIS)').^2)';            % 初始噪声功率谱方差
+LambdaD=mean((Y(:,1:NIS)').^2)';            % 初始噪声功率谱方差 
+% LambdaD2=mean((Y(:,1:NIS).^2).').';
+% display(LambdaD == LambdaD2);
 alpha=.99;                                  % 设置平滑系数
 fn=numberOfFrames;
 miniL=5;                                    % 设置miniL
@@ -48,6 +50,7 @@ NoiseCounter=0;                             % 初始化NoiseCounter
 NoiseLength=9;                              % 设置噪声平滑区间长度
 G=ones(size(N));                            % 初始化谱估计器
 Gamma=G;
+% xi=G;
 X=zeros(size(Y));                           % 初始化X
 h=waitbar(0,'Wait...');                     % 设置运行进度条图 
 for i=1:numberOfFrames
@@ -55,23 +58,28 @@ for i=1:numberOfFrames
     if i<=NIS                               % 若i<=NIS在前导无声(噪声)段
         SpeechFlag=0;
         NoiseCounter=100;
-    %else                                   % i>NIS判断是否为有话帧
-        %[NoiseFlag, SpeechFlag, NoiseCounter, Dist]=vad(Y(:,i),N,NoiseCounter); 
+%     else                                   % i>NIS判断是否为有话帧
+%         [NoiseFlag, SpeechFlag, NoiseCounter, Dist]=vad(Y(:,i),N,NoiseCounter); 
     end
-    if SpeechFlag==0                         % 在无话段中平滑更新噪声谱值
-        N=(NoiseLength*N+Y(:,i))/(NoiseLength+1); 
+    if SpeechFlag==0                         
+        N=(NoiseLength*N+Y(:,i))/(NoiseLength+1); % 在无话段中平滑更新噪声谱值
         LambdaD=(NoiseLength*LambdaD+(Y(:,i).^2))./(1+NoiseLength);%更新和平滑噪声方差
     end
 
     gammaNew=(Y(:,i).^2)./LambdaD;          % 计算后验信噪比
-    xi=alpha*(G.^2).*Gamma+(1-alpha).*max(gammaNew-1,0); % 计算先验信噪比
+%     xi=alpha*xi+(1-alpha).*max(gammaNew-1,0); % 计算先验信噪比
+    % 就是依照经验值吧
+    xi=alpha*G.^2.*Gamma+(1-alpha).*max(gammaNew-1,0);
+    
     Gamma=gammaNew;
-    G=(xi./(xi+1));                         % 计算维纳滤波器的谱估计器
+    G=(xi./(xi+1));                         % 计算维纳滤波器的谱估计器 这就是频域维纳滤波器系数
+    % 维纳滤波器系数应该收敛吗？应该是不收敛的吧
     X(:,i)=G.*Y(:,i);                       % 维纳滤波后的幅值
 %显示运行进度条图
-    waitbar(i/numberOfFrames,h,num2str(fix(100*i/numberOfFrames)));
+    waitbar(i/numberOfFrames,h,strcat(num2str(fix(100*i/numberOfFrames)),'%'));
 end
 close(h);                                   % 关闭运行进度条图
 output=OverlapAdd2(X,YPhase,W,SP*W);        % 语音合成
 output=filter(1,[1 -pre_emph],output);      % 消除预加重影响
+%为什么要做归一化呢
 output=output/max(abs(output));
