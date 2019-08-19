@@ -18,6 +18,7 @@ x=[x_c,x];
 frame_num=size(x, 2);
 xx=zeros(frame_len*2,frame_num);
 for i=1:frame_num
+    %Ê±ÓòµÄµþ¼Ó
     real_x=x(1:frame_len*2,i)+x(frame_len*2+1:frame_len*4,i)+x(frame_len*4+1:frame_len*6,i);
     xx(:,i)=real_x;
 end
