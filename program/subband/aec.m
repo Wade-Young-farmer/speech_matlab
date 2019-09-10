@@ -1,32 +1,12 @@
-aec_status.x=0;
-aec_status.y=0;
-aec_status.ref_peak_track=0;
-aec_status.peak_hold_frame=0;
-peak_smooth_factor=1-exp(-0.1);
-aec_status.far_end_holdtime=1;
-aec_status.far_end_talk_flag=0;
-aec_status.no_ref_count=0;
-band_table=[3,9,10,19,20,48,49,125]; %因为序号的关系都要+1
-aec_status.ref_peak_energy=zeros(1,4);
-alpha_peak=1-0.9048;
-aec_status.stack_sig_low=zeros(32,20); %1-32频段
-aec_status.stack_sig_hi=zeros(96,16);  %33-128频段
-aec_status.fir_far_end_holdtime=0;
-high_pass_freq_coeff=[0,0.0396,0.7, 0.9204];
 function val=my_smooth(y,x,f)
-val=f*x+(1-f)*y
+val=f*x+(1-f)*y;
 
-function [mic_out, mic_complex_out, dt_st, aec_status]=aec(aec_status, 
-                                                           mic_complex_in, %[129, frame_num]
-                                                           ref_complex_in, %[129, frame_num]
-                                                           mic_in, %[128,frame_num]
-                                                           ref_in, %[128,frame_num]
-                                                           dt_st)
+function [mic_out,mic_complex_out, dt_st, aec_status]=aec(aec_status,mic_complex_in,ref_complex_in,mic_in,ref_in,dt_st)
 mic_out=0;
 mic_complex_out=0;
 dt_st=0;
 aec_status=0;
-%%TDE_ENABLE
+%% TDE_ENABLE
 
 
 frame_num = size(ref_in, 2);
@@ -91,12 +71,13 @@ for i = 1:frame_num
     aec_status.stack_sig_hi(:,1)=ref_in(33:128,i);
     
     %% 麦克风信号开始处理
-    mic_in=mic_complex_in(:,i);
-    mic_in_=mic_in;
+    mic_in_=mic_in(:,i);
+    mic_complex_in_=mic_complex_in(:,i);
+    mic_complex_in__=mic_complex_in_;
     
     if aec_status.no_ref_cnt < 500 % 不是一直无ref的情况，意思就是有可能有内噪，500 *0.008，就是说有内噪，或者播放结束4s内
         % 高频滤波
-        mic_in(1:4)=mic_in(1:4).*high_pass_freq_coeff.';
+        mic_complex_in_(1:4)=mic_complex_in_(1:4).*high_pass_freq_coeff.';
         aec_status.fir_far_end_holdtime=aec_status.far_end_holdtime;
         
         % 线性fir
@@ -106,6 +87,14 @@ for i = 1:frame_num
     
     
 end
+function [fir_output,fir_power_output]=aec_fir(aec_status,mic_in_,mic_complex_in_)
+%aec_status包含stack_sig_low, stack_sig_hi, double_talk_result[0],noise_est_mic_chan
+mm=max(abs(mic_in_));
 
-function [fir_output]=aec_fir(aec_status,mic_in,mic_in_energy
+
+
+
+
+
+
 
