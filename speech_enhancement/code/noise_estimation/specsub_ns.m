@@ -72,7 +72,7 @@ if nargin<3
 end
 
 
-[x,Srate,nbits]=wavread(filename);
+[x,Srate]=audioread(filename);
 
 
 % =============== Initialize variables ===============
@@ -159,7 +159,7 @@ for n=1:Nframes
 end
 %========================================================================================
 
-wavwrite(xfinal,Srate,16,outfile);
+audiowrite(outfile,xfinal,Srate);
 
 %-------------------------------- E N D --------------------------------------
 function a=berouti1(SNR)
