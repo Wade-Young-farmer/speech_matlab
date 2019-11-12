@@ -71,8 +71,12 @@ if nargin<3
     return;
 end
 
+Srate=16000;
+file_id=fopen(filename, 'r');
+x=fread(file_id, inf, 'int16');
+fclose(file_id);
 
-[x,Srate]=audioread(filename);
+% [x,Srate]=audioread(filename);
 
 
 % =============== Initialize variables ===============
@@ -159,7 +163,10 @@ for n=1:Nframes
 end
 %========================================================================================
 
-audiowrite(outfile,xfinal,Srate);
+% audiowrite(outfile,xfinal,Srate);
+file_id=fopen(outfile,'wb');
+fwrite(file_id,xfinal,'int16');
+fclose(file_id);
 
 %-------------------------------- E N D --------------------------------------
 function a=berouti1(SNR)
