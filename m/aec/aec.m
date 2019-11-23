@@ -53,6 +53,12 @@ power_echo=zeros(1,129);
 
 erl_peak=zeros(1,4);
 
+
+res_psd_smooth=zeros(1,129);
+near_psd_smooth=zeros(1,129);
+ref_psd_smooth=zeros(1,129);
+corr_near_res_smooth=zeros(1,129);
+corr_near_ref_smooth=zeros(1,129);
 for i=1:size(x_enframe,1)
     input_buffer(1:128)=input_buffer(129:256);
     input_buffer(129:256)=x_enframe(i,:);
@@ -370,7 +376,35 @@ for i=1:size(x_enframe,1)
         end
         
         % nlp
-        % input_r, fir_out, input_f, ref_peak
+        % input_r, fir_out, input_f, ref_peak£¬far_end_hold_time, 1, 0
+        if ref_peak > 5000
+            volumn = 1;
+        else
+            volumn = 0;
+        end
+        
+        res_psd=abs(fir_out).^2;
+        near_psd=abs(input_f).^2;
+        ref_psd=abs(input_r).^2;
+        res_psd_smooth=0.7165*res_psd_smooth + (1-0.7165)*res_psd;
+        near_psd_smooth=0.7165*near_psd_smooth + (1-0.7165)*near_psd;
+        ref_psd_smooth=0.7165*ref_psd_smooth + (1-0.7165)*max(16,ref_psd);
+        corr_near_res=conj(input_f) .* fir_out;
+        corr_near_res_smooth=0.7165*corr_near_res_smooth + (1-0.7165)*corr_near_res;
+        coh_temp_1=(corr_near_res_smooth.^2)/(res_psd_smooth .* near_psd_smooth + 10^-10);
+        res_psd_temp=sum(res_psd(3:126));
+        near_psd_temp=sum(near_psd(3:126));
+        corr_near_ref=conj(input_f) .* input_r;
+        corr_near_ref_smooth=0.7165*corr_near_ref_smooth + (1-0.7165)*corr_near_ref;
+        coh_temp_2=(corr_near_ref_smooth.^2)/(
+        
+        
+        
+        
+        for k=3:126
+            
+        end
+        
         
         
         
