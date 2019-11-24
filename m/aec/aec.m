@@ -59,6 +59,59 @@ near_psd_smooth=zeros(1,129);
 ref_psd_smooth=zeros(1,129);
 corr_near_res_smooth=zeros(1,129);
 corr_near_ref_smooth=zeros(1,129);
+nlp_coeff_temp=1.0;
+near_state_hold=0;
+near_state=0;
+over_drive=2;
+over_drive_smooth=2;
+
+nl_coeff_fb_min=0;
+nl_coeff_fb_local_min=1;
+nlp_is_new_min=0;
+nlp_new_min_ctrl=0;
+nlp_min_hold_time=0;
+min_coeff_tmp=1;
+% 129 bins
+WEB_RTC_AEC_NL_WEIGHT_CURVE = [
+    0.0000,  0.1000,  0.1266,  0.1376,
+    0.1461,  0.1532,  0.1595,  0.1652,
+    0.1704,  0.1753,  0.1799,  0.1842,
+    0.1883,  0.1922,  0.1960,  0.1996,
+    0.2031,  0.2065,  0.2098,  0.2129,
+    0.2160,  0.2191,  0.2220,  0.2249,
+    0.2277,  0.2304,  0.2331,  0.2357,
+    0.2383,  0.2409,  0.2434,  0.2458,
+    0.2482,  0.2506,  0.2529,  0.2552,
+    0.2575,  0.2597,  0.2619,  0.2641,
+    0.2662,  0.2684,  0.2705,  0.2725,
+    0.2746,  0.2766,  0.2786,  0.2806,
+    0.2825,  0.2844,  0.2863,  0.2882,
+    0.2901,  0.2920,  0.2938,  0.2956,
+    0.2974,  0.2992,  0.3010,  0.3027,
+    0.3045,  0.3062,  0.3079,  0.3096,
+    0.3113,  0.3130,  0.3146,  0.3163,
+    0.3179,  0.3195,  0.3211,  0.3227,
+    0.3243,  0.3259,  0.3274,  0.3290,
+    0.3305,  0.3321,  0.3336,  0.3351,
+    0.3366,  0.3381,  0.3396,  0.3411,
+    0.3425,  0.3440,  0.3454,  0.3469,
+    0.3483,  0.3497,  0.3511,  0.3525,
+    0.3539,  0.3553,  0.3567,  0.3581,
+    0.3595,  0.3608,  0.3622,  0.3635,
+    0.3649,  0.3662,  0.3675,  0.3689,
+    0.3702,  0.3715,  0.3728,  0.3741,
+    0.3754,  0.3767,  0.3779,  0.3792,
+    0.3805,  0.3817,  0.3830,  0.3842,
+    0.3855,  0.3867,  0.3879,  0.3892,
+    0.3904,  0.3916,  0.3928,  0.3940,
+    0.3952,  0.3964,  0.3976,  0.3988, 0.4000];
+
+DOUBLETALK_BAND_TABLE = [ 9, 11, 12, 15, 16, 18, 19, 21, 22, 24, 25, 27, 28, 
+                          31, 32, 34, 35, 37, 38, 40, 41, 43, 44, 47, 48, 50, 
+                          51, 53, 54, 56, 57, 59, 60, 63, 64, 66, 67, 69, 70, 
+                          72, 73, 75, 76, 79, 80, 82, 83, 85, 86, 88, 89, 91, 
+                          92, 95, 96, 98, 99, 101, 102, 104, 105, 107, 108, 111,
+                          112, 114, 115, 117, 118, 120, 121, 123, 124, 126];
 for i=1:size(x_enframe,1)
     input_buffer(1:128)=input_buffer(129:256);
     input_buffer(129:256)=x_enframe(i,:);
@@ -391,19 +444,118 @@ for i=1:size(x_enframe,1)
         ref_psd_smooth=0.7165*ref_psd_smooth + (1-0.7165)*max(16,ref_psd);
         corr_near_res=conj(input_f) .* fir_out;
         corr_near_res_smooth=0.7165*corr_near_res_smooth + (1-0.7165)*corr_near_res;
-        coh_temp_1=(corr_near_res_smooth.^2)/(res_psd_smooth .* near_psd_smooth + 10^-10);
-        res_psd_temp=sum(res_psd(3:126));
-        near_psd_temp=sum(near_psd(3:126));
+        coh_temp_1=(abs(corr_near_res_smooth).^2)/(res_psd_smooth .* near_psd_smooth + 10^-10);
+        % res_psd_temp=sum(res_psd(3:126));
+        % near_psd_temp=sum(near_psd(3:126));
         corr_near_ref=conj(input_f) .* input_r;
         corr_near_ref_smooth=0.7165*corr_near_ref_smooth + (1-0.7165)*corr_near_ref;
-        coh_temp_2=(corr_near_ref_smooth.^2)/(
+        coh_temp_2=(abs(corr_near_ref_smooth).^2)/(near_psd_smooth .* ref_psd_smooth + 10^-10);
         
+        coh_near_ref_avg=mean(coh_temp_2(5:32));
+        coh_near_res_avg=mean(coh_temp_1(5:32)); % near is input here
         
-        
-        
-        for k=3:126
-            
+        if 1 - coh_near_ref_avg < min(0.75, nlp_coeff_temp)
+            nlp_coeff_temp = 1 - coh_near_ref_avg;
         end
+        
+        if coh_near_res_avg > 0.8 && coh_near_ref_avg < 0.3
+            near_state = 1; % 这个state代表什么含义，决定了nlp的效果
+            near_state_hold = 0;
+        elseif coh_near_res_avg < 0.75 || coh_near_ref_avg > 0.5
+            if near_state_hold == 3
+                near_state = 0;
+            else
+                near_state_hold = near_state_hold + 1;
+            end
+        end
+        
+        if far_end_hold_time == 0
+            near_state = 1; % represents someone is talking
+            near_state_hold = 0;
+        end
+        
+        if nlp_coeff_temp == 1
+            over_drive=1;
+            if near_state == 1
+                nl_coeff=coh_temp_1;
+                nl_coeff_fb = coh_near_res_avg;
+                nl_coeff_fb_low = coh_near_res_avg;
+                % 选near_res
+            else
+                % 选1- near_far
+                nl_coeff=1- coh_temp_2;
+                nl_coeff_fb=1- coh_near_ref_avg;
+                nl_coeff_fb_low= 1- coh_near_ref_avg;
+            end
+        else
+            if volumn == 0 && near_state == 1
+                nl_coeff=coh_temp_1;
+                nl_coeff_fb = coh_near_res_avg;
+                nl_coeff_fb_low = coh_near_res_avg;
+                % 选 near_res
+            else
+                % 选 min(near_res, 1 - near_far)
+                nl_coeff=min(coh_temp_1, 1-coh_temp_2);
+                nl_coeff_temp_array=sort(nl_coeff(5:32));
+                nl_coeff_fb = nl_coeff_temp_array(21);
+                nl_coeff_fb_low = nl_coeff_temp_array(14);
+            end
+        end
+        
+        nlp_coeff_temp = min(nlp_coeff_temp+0.0003, 1);
+        
+        % Min track nl_coeff_fb， is not used in none wakeup judge case
+        if nl_coeff_fb_low < min(0.6, nl_coeff_fb_local_min)
+            nl_coeff_fb_min = nl_coeff_fb_low;
+            nl_coeff_fb_local_min = nl_coeff_fb_low;
+            nlp_is_new_min=1;
+            nlp_new_min_ctrl=0;
+            nlp_min_hold_time=0;
+        else
+            nlp_min_hold_time=nlp_min_hold_time+1;
+        end
+        
+        if nlp_min_hold_time > 100 && nl_coeff_fb_low < min_coeff_tmp
+            min_coeff_tmp = nl_coeff_fb_low;
+        end
+           
+        if nlp_min_hold_time > 300 
+            nl_coeff_fb_local_min = min_coeff_tmp;
+            nl_coeff_fb_min = min_coeff_tmp;
+            min_coeff_tmp = 1;
+            nlp_min_hold_time = 150;
+        end
+        
+        nl_coeff_fb_local_min = min(nl_coeff_fb_local_min + 0.0004, 1);
+        if nlp_is_new_min == 1
+            nlp_new_min_ctrl = nlp_new_min_ctrl + 1;
+        end
+        if nlp_new_min_ctrl == 2
+            nlp_is_new_min = 0;
+            nlp_new_min_ctrl = 0;
+            over_drive = max(-1.15 / (log(nl_coeff_fb_min + 10^-10) + 10^-10), 1);
+        end
+        
+        if over_drive < over_drive_smooth
+            over_drive_smooth = 0.99 * over_drive_smooth + 0.01 * over_drive;
+        else
+            over_drive_smooth = 0.9 * over_drive_smooth + 0.1 * over_drive;
+        end
+        
+        nl_coeff = abs(nl_coeff); 
+        for k=3:126
+            if nl_coeff(k) > nl_coeff_fb
+               nl_coeff(k) = (1 -WEB_RTC_AEC_NL_WEIGHT_CURVE(k)) * nl_coeff(k) + WEB_RTC_AEC_NL_WEIGHT_CURVE(k) * nl_coeff_fb;
+            end
+            
+            % judge difference is here!
+            fir_out(k) = fir_out(k) * nl_coeff(k);
+        end
+        
+        fir_out_e = abs(fir_out).^2;
+        
+        % double_talk
+        % fir_out_e, ref_e, erl_ratio, B, far_end_hold_time
         
         
         
