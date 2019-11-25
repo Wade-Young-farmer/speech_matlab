@@ -45,6 +45,7 @@ mse_mic=zeros(1, 129);
 
 erl_ratio=ones(1,4)*0.25;
 dt_flag=0;
+dt_flag_strict=0;
 fir_update_flag=zeros(1, 129);
 fir_out=zeros(1, 129);
 power_ori_mic=zeros(1, 129);
@@ -112,6 +113,13 @@ DOUBLETALK_BAND_TABLE = [ 9, 11, 12, 15, 16, 18, 19, 21, 22, 24, 25, 27, 28,
                           72, 73, 75, 76, 79, 80, 82, 83, 85, 86, 88, 89, 91, 
                           92, 95, 96, 98, 99, 101, 102, 104, 105, 107, 108, 111,
                           112, 114, 115, 117, 118, 120, 121, 123, 124, 126];
+DOUBLETALK_BAND_TABLE = DOUBLETALK_BAND_TABLE +1;
+dt_spk_peak=zeros(1, 37);
+dt_frame_count = 0;
+mic_ratio_smooth = 0;
+dt_count=0;
+dt_count_strict=0;
+
 for i=1:size(x_enframe,1)
     input_buffer(1:128)=input_buffer(129:256);
     input_buffer(129:256)=x_enframe(i,:);
@@ -556,18 +564,102 @@ for i=1:size(x_enframe,1)
         
         % double_talk
         % fir_out_e, ref_e, erl_ratio, B, far_end_hold_time
+        dt_mic_psd_sum=0;
+        mic_spk_ratio=0;
+        for j=1:37
+            freq=(j-1+0.5)*200 + 600;
+            dt_spk_psd=sum(ref_e(DOUBLETALK_BAND_TABLE(2*j-1):DOUBLETALK_BAND_TABLE(2*j)-1));
+            dt_mic_psd=sum(fir_out_e(DOUBLETALK_BAND_TABLE(2*j-1):DOUBLETALK_BAND_TABLE(2*j)-1));
+            dt_ns_psd=sum(B);
+            
+            if freq > 800
+                dt_mic_psd_sum = dt_mic_psd_sum + dt_mic_psd;
+            end
+            
+            dt_mic_psd = dt_mic_psd - 10 * dt_ns_psd;
+            dt_mic_psd = max(dt_mic_psd, 0);
+            
+            if dt_spk_peak(j) < dt_spk_psd(j)
+                dt_spk_peak(j) = dt_spk_psd(j);
+            else
+                dt_spk_peak(j) = 0.7 * dt_spk_peak(j) + 0.3 * dt_spk_peak(j);
+            end
+            
+            if freq >= 0 && freq < 600 
+                index = 1;
+            elseif freq >= 600 && freq < 1200
+                index = 2;
+            elseif freq >= 1200 && freq < 3000
+                index = 3;
+            else
+                index = 4;
+            end
+            
+            if far_end_hold_time == 20
+                mic_spk_ratio = mic_spk_ratio + dt_mic_psd/(dt_spk_peak(j) * erl_ratio(index)); % sum of ratio?
+            end
+        end
         
+        if far_end_hold_time == 20
+            D = 10; % track dt_mic_psd_sum
+        end
         
+        mic_snr = dt_mic_psd_sum / D;
+        if dt_frame_count < 10
+            mic_ratio_smooth = mic_spk_ratio;
+        else
+            if mic_ratio_smooth < mic_spk_ratio
+                mic_ratio_smooth = 0.95 * mic_ratio_smooth + 0.05 * mic_spk_ratio;
+            else
+                mic_ratio_smooth = 0.85 * mic_ratio_smooth + 0.15 * mic_spk_ratio;
+            end
+        end
         
+        if far_end_hold_time == 20
+            E = 1; % track mic_ratio_smooth
+        end
+        mic_ratio_level = mic_spk_ratio / E;
+        if dt_frame_count < 10
+            dt_frame_count = dt_frame_count +1;
+            dt_flag = 0;
+            dt_flag_strict = 0;
+        else
+            if mic_ratio_level > 10 && mic_snr > 50
+                dt_count =40;
+            else
+                dt_count = max(0, dt_count-1);
+            end
+            
+            if dt_count > 0
+                dt_flag = 2;
+            end
+            
+            if far_end_hold_time == 0
+                dt_flag = 1;
+            end
+            
+            if mic_ratio_level > 50 && mic_snr > 100
+                dt_count_strict = 40;
+            else
+                dt_count_strict = max(0, dt_count_strict -1);
+            end
+            
+            if dt_count_strict > 0
+                dt_flag_strict = 2;
+            end
+            
+            if far_end_hold_time == 0;
+                dt_flag_strict = 1;
+            end
+        end
         
+        if dt_flag == 0
+            for k = 3:125
+                F = 1; % track power_ori_mic
+            end
+        end 
     end
     
-    
-    
-    
-    
-    
-        
     
 end
 end
