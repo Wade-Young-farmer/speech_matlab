@@ -1,7 +1,11 @@
-function my_aec(mic_name, ref_name)
+function my_aec(mic_name, mic_name_2, ref_name)
 Srate=16000;
 file_id=fopen(mic_name, 'r');
 x=fread(file_id, inf, 'int16');
+fclose(file_id);
+
+file_id=fopen(mic_name_2, 'r');
+x2=fread(file_id, inf, 'int16');
 fclose(file_id);
 
 file_id=fopen(ref_name, 'r');
@@ -10,6 +14,9 @@ fclose(file_id);
 
 x_enframe = enframe(x,128);
 input_buffer=zeros(1, 256);
+
+x2_enframe = enframe(x,128);
+input_buffer2=zeros(1, 256);
 
 r_enframe = enframe(r,128);
 ref_buffer=zeros(1, 256);
@@ -48,6 +55,7 @@ dt_flag=0;
 dt_flag_strict=0;
 fir_update_flag=zeros(1, 129);
 fir_out=zeros(1, 129);
+fir_out2=zeros(1, 129);
 power_ori_mic=zeros(1, 129);
 fir_est_ref=zeros(1, 129);
 power_echo=zeros(1,129);
@@ -72,6 +80,25 @@ nlp_is_new_min=0;
 nlp_new_min_ctrl=0;
 nlp_min_hold_time=0;
 min_coeff_tmp=1;
+
+res_psd_smooth2=zeros(1,129);
+near_psd_smooth2=zeros(1,129);
+ref_psd_smooth2=zeros(1,129);
+corr_near_res_smooth2=zeros(1,129);
+corr_near_ref_smooth2=zeros(1,129);
+nlp_coeff_temp2=1.0;
+near_state_hold2=0;
+near_state2=0;
+over_drive2=2;
+over_drive_smooth2=2;
+
+nl_coeff_fb_min2=0;
+nl_coeff_fb_local_min2=1;
+nlp_is_new_min2=0;
+nlp_new_min_ctrl2=0;
+nlp_min_hold_time2=0;
+min_coeff_tmp2=1;
+
 % 129 bins
 WEB_RTC_AEC_NL_WEIGHT_CURVE = [
     0.0000,  0.1000,  0.1266,  0.1376,
@@ -120,12 +147,20 @@ mic_ratio_smooth = 0;
 dt_count=0;
 dt_count_strict=0;
 
+total_input_f=zeros(1, 258);
 for i=1:size(x_enframe,1)
     input_buffer(1:128)=input_buffer(129:256);
+    input_buffer2(1:128)=input_buffer2(129:256);
     input_buffer(129:256)=x_enframe(i,:);
+    input_buffer2(129:256)=x2_enframe(i,:);
     input_f=fft(input_buffer);
+    input_f2=fft(input_buffer2);
     input_f=input_f(1:129);
+    input_f2=input_f2(1:129);
+    input_f_bak = input_f;
+    input_f2_bak = input_f2;
     input_t=x_enframe(i,:);
+    input_t2=x2_enframe(i,:);
     
     ref_buffer(1:128)=ref_buffer(129:256);
     ref_buffer(129:256)=r_enframe(i,:);
@@ -194,7 +229,7 @@ for i=1:size(x_enframe,1)
         if far_end_hold_time < 20
             ref_cnt=20; % naming not reasonable
         else
-            ref_cnt=max(0, ref_cnt-1);
+            ref_cnt=max(0, ref_cnt-1); % there is a far end lasting for 20 frames, would make a zero
         end
         
         if mic_peak > 28000
@@ -216,7 +251,7 @@ for i=1:size(x_enframe,1)
             est_adf_e = abs(est_adf).^2;
             err_fir=input_f(k)-est_fir;
             err_adf=input_f(k)-est_adf;
-            input_power=sum(abs(stack_ref_low(k,:)).^2);
+            input_power=sum(abs(stack_ref_low(k,:)).^2); % sum of buffer of length of 20
             norm_step=0.5/(input_power+0.01);
             err_fir_e=abs(err_fir).^2;
             err_adf_e=abs(err_adf).^2;
@@ -263,7 +298,7 @@ for i=1:size(x_enframe,1)
             end
             
             B=1; % B是一级ns的值，每个mic的每个频点都会估计出一个
-            if input_power * erl_ratio(subband_index) > tmp * B && filter_freeze == 0
+            if input_power * erl_ratio(subband_index) > tmp * B && filter_freeze == 0 % tmp is for dt state threshold
                 adf_coeff_low(k,:) = adf_coeff_low(k,:) + norm_step * err_adf' * stack_ref_low(k,:);
                 fir_update_flag(k)=1;
             else
@@ -286,6 +321,7 @@ for i=1:size(x_enframe,1)
                 power_echo(k)=est_adf_e;
                 if err_adf_e > min_power_early
                     fir_out(k)=early_out;
+                    % fir_out(k)=early_out;
                 else
                     fir_out(k)=err_adf;
                 end 
@@ -401,6 +437,7 @@ for i=1:size(x_enframe,1)
             fir_out(k)=0;
         end
         
+        total_input_f(1:129)=fir_out(1:129);
         %  erl
         input_mic_energy=zeros(1,4);
         est_mic_energy=zeros(1,4);
@@ -478,11 +515,11 @@ for i=1:size(x_enframe,1)
         end
         
         if far_end_hold_time == 0
-            near_state = 1; % represents someone is talking
+            near_state = 1; % represents someone is talking or speaker is not talking
             near_state_hold = 0;
         end
         
-        if nlp_coeff_temp == 1
+        if nlp_coeff_temp == 1 % represents no far end
             over_drive=1;
             if near_state == 1
                 nl_coeff=coh_temp_1;
@@ -658,7 +695,150 @@ for i=1:size(x_enframe,1)
                 F = 1; % track power_ori_mic
             end
         end 
+    else
+        total_input_f(1:129) = input_f_bak;
     end
+    
+    % deal with 2nd mic, should not used if not for efficiency purpose
+    if no_ref_count < 500
+        input_f2(1:4)=input_f2(1:4).*AEC_HPF_COEFF;
+        %retf process
+        fir_out2=input_f2;
+        total_input_f(130:258)=fir_out2;
+    else
+        total_input_f(130:258)=input_f2_bak;
+    end
+    
+    if no_ref_count < 500
+        total_input_f(130:258) = total_input_f(130:258) .* max(1, abs(total_input_f(1:129)) .* abs(input_f2_bak) / (abs(total_input_f(130:258)) .* abs(input_f_bak) + 10^-10));    
+        fir_out2 = total_input_f(130:258);
+        
+        % nlp
+        % use input_f2_bak instead of input_f2, should be the same, but
+        % should be the same
+        % input_r, fir_out2, input_f2_bak, ref_peak，far_end_hold_time, 0, 0
+        if ref_peak > 5000
+            volumn = 1;
+        else
+            volumn = 0;
+        end        
+        res_psd=abs(fir_out2).^2;
+        near_psd=abs(input_f2).^2;
+        ref_psd=abs(input_r).^2;
+        res_psd_smooth2=0.7165*res_psd_smooth2 + (1-0.7165)*res_psd;
+        near_psd_smooth2=0.7165*near_psd_smooth2 + (1-0.7165)*near_psd;
+        ref_psd_smooth2=0.7165*ref_psd_smooth2 + (1-0.7165)*max(16,ref_psd);
+        corr_near_res=conj(input_f2) .* fir_out2;
+        corr_near_res_smooth=0.7165*corr_near_res_smooth + (1-0.7165)*corr_near_res;
+        coh_temp_1=(abs(corr_near_res_smooth).^2)/(res_psd_smooth .* near_psd_smooth + 10^-10);
+        % res_psd_temp=sum(res_psd(3:126));
+        % near_psd_temp=sum(near_psd(3:126));
+        corr_near_ref=conj(input_f) .* input_r;
+        corr_near_ref_smooth=0.7165*corr_near_ref_smooth + (1-0.7165)*corr_near_ref;
+        coh_temp_2=(abs(corr_near_ref_smooth).^2)/(near_psd_smooth .* ref_psd_smooth + 10^-10);
+        
+        coh_near_ref_avg=mean(coh_temp_2(5:32));
+        coh_near_res_avg=mean(coh_temp_1(5:32)); % near is input here
+        
+        if 1 - coh_near_ref_avg < min(0.75, nlp_coeff_temp)
+            nlp_coeff_temp = 1 - coh_near_ref_avg;
+        end
+        
+        if coh_near_res_avg > 0.8 && coh_near_ref_avg < 0.3
+            near_state = 1; % 这个state代表什么含义，决定了nlp的效果
+            near_state_hold = 0;
+        elseif coh_near_res_avg < 0.75 || coh_near_ref_avg > 0.5
+            if near_state_hold == 3
+                near_state = 0;
+            else
+                near_state_hold = near_state_hold + 1;
+            end
+        end
+        
+        if far_end_hold_time == 0
+            near_state = 1; % represents someone is talking or speaker is not talking
+            near_state_hold = 0;
+        end
+        
+        if nlp_coeff_temp == 1 % represents no far end
+            over_drive=1;
+            if near_state == 1
+                nl_coeff=coh_temp_1;
+                nl_coeff_fb = coh_near_res_avg;
+                nl_coeff_fb_low = coh_near_res_avg;
+                % 选near_res
+            else
+                % 选1- near_far
+                nl_coeff=1- coh_temp_2;
+                nl_coeff_fb=1- coh_near_ref_avg;
+                nl_coeff_fb_low= 1- coh_near_ref_avg;
+            end
+        else
+            if volumn == 0 && near_state == 1
+                nl_coeff=coh_temp_1;
+                nl_coeff_fb = coh_near_res_avg;
+                nl_coeff_fb_low = coh_near_res_avg;
+                % 选 near_res
+            else
+                % 选 min(near_res, 1 - near_far)
+                nl_coeff=min(coh_temp_1, 1-coh_temp_2);
+                nl_coeff_temp_array=sort(nl_coeff(5:32));
+                nl_coeff_fb = nl_coeff_temp_array(21);
+                nl_coeff_fb_low = nl_coeff_temp_array(14);
+            end
+        end
+        
+        nlp_coeff_temp = min(nlp_coeff_temp+0.0003, 1);
+        
+        % Min track nl_coeff_fb， is not used in none wakeup judge case
+        if nl_coeff_fb_low < min(0.6, nl_coeff_fb_local_min)
+            nl_coeff_fb_min = nl_coeff_fb_low;
+            nl_coeff_fb_local_min = nl_coeff_fb_low;
+            nlp_is_new_min=1;
+            nlp_new_min_ctrl=0;
+            nlp_min_hold_time=0;
+        else
+            nlp_min_hold_time=nlp_min_hold_time+1;
+        end
+        
+        if nlp_min_hold_time > 100 && nl_coeff_fb_low < min_coeff_tmp
+            min_coeff_tmp = nl_coeff_fb_low;
+        end
+           
+        if nlp_min_hold_time > 300 
+            nl_coeff_fb_local_min = min_coeff_tmp;
+            nl_coeff_fb_min = min_coeff_tmp;
+            min_coeff_tmp = 1;
+            nlp_min_hold_time = 150;
+        end
+        
+        nl_coeff_fb_local_min = min(nl_coeff_fb_local_min + 0.0004, 1);
+        if nlp_is_new_min == 1
+            nlp_new_min_ctrl = nlp_new_min_ctrl + 1;
+        end
+        if nlp_new_min_ctrl == 2
+            nlp_is_new_min = 0;
+            nlp_new_min_ctrl = 0;
+            over_drive = max(-1.15 / (log(nl_coeff_fb_min + 10^-10) + 10^-10), 1);
+        end
+        
+        if over_drive < over_drive_smooth
+            over_drive_smooth = 0.99 * over_drive_smooth + 0.01 * over_drive;
+        else
+            over_drive_smooth = 0.9 * over_drive_smooth + 0.1 * over_drive;
+        end
+        
+        nl_coeff = abs(nl_coeff); 
+        for k=3:126
+            if nl_coeff(k) > nl_coeff_fb
+               nl_coeff(k) = (1 -WEB_RTC_AEC_NL_WEIGHT_CURVE(k)) * nl_coeff(k) + WEB_RTC_AEC_NL_WEIGHT_CURVE(k) * nl_coeff_fb;
+            end
+            
+            % judge difference is here!
+            fir_out(k) = fir_out(k) * nl_coeff(k);
+        end        
+    end
+    
     
     
 end
