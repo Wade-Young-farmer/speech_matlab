@@ -152,6 +152,12 @@ stack_est_ref=zeros(129,6);
 dt_hold_age=40;
 post_over_drive_sm=0;
 
+fir_coeff_2=zeros(129,6);
+adf_coeff_2=zeros(129,6);
+mse_fir2=zeros(1, 129);
+mse_adf2=zeros(1, 129);
+mse_mic2=zeros(1, 129);
+
 for i=1:size(x_enframe,1)
     input_buffer(1:128)=input_buffer(129:256);
     input_buffer2(1:128)=input_buffer2(129:256);
@@ -711,7 +717,56 @@ for i=1:size(x_enframe,1)
     if no_ref_count < 500
         input_f2(1:4)=input_f2(1:4).*AEC_HPF_COEFF;
         %retf process
-        fir_out2=input_f2;
+        % input_f2, stack_est_ref, fir_out2, fir_update_flag
+        input_f2_e = abs(input_f2).^2;
+        for k =1:129
+            est_ref_fir = stack_est_ref(k,:) * fir_coeff_2';
+            est_ref_adf = stack_est_ref(k,:) * adf_coeff_2';
+            est_ref_fir_e = abs(est_ref_fir)^2;
+            est_ref_adf_e = abds(est_ref_adf)^2;
+            err_fir = input_f2(k) - est_ref_fir;
+            err_adf = input_f2(k) - est_ref_adf;
+            mu = 0.5 / (sum(abs(stack_est_ref(k, :).^2) + 0.01);
+            err_fir_e = abs(err_fir).^2;
+            err_adf_e = abs(err_adf).^2;
+            mse_fir2(k) = 0.9608 * mse_fir2(k) + (1-0.9608) * err_fir_e(k);
+            mse_adf2(k) = 0.9608 * mse_adf2(k) + (1-0.9608) * err_adf_e(k);
+            mse_mic2(k) = 0.9608 * mse_mic2(k) + (1-0.9608) * input_f2_e(k);
+            
+            if mse_adf2(k) > mse_mic2(k) * 8
+                adf_coeff_2(k, :) = 0;
+                mse_adf2(k) = mse_mic2(k);
+                err_adf = input_f2(k);
+            elseif mse_mic2(k) > mse_adf2(k) * 8 && mse_adf2(k) < 0.5 * mse_fir2(k)
+                fir_coeff_2(k,:)= adf_coeff_2(k,:);
+                mse_fir2(k) = mse_adf2(k);
+                err_fir=err_adf;
+            end
+            
+            if mse_fir2(k) > mse_mic2(k) * 8
+                fir_coeff_2(k,:)=0;
+                mse_fir2(k)=mse_mic2(k);
+                err_fir =input_f2(k);
+            elseif mse_mic2(k) > mse_fir2(k) * 8 && mse_fir2(k) < 0.5 * mse_adf2(k)
+                adf_coeff_2(k,:) = fir_coeff_2(k,:);
+                mse_adf2(k) = mse_fir2(k);
+                err_adf=err_fir;
+            end
+            
+            if fir_update_flag(k) == 1
+                adf_coeff_2(k,:) = adf_coeff_2(k,:) + mu * err_adf' * stack_est_ref(k,:);
+            end
+            
+            if err_fir_e >= err_adf_e && err_adf_e < input_f2_e(k)
+                fir_out2(k) = err_adf;
+            elseif err_fir_e >= err_adf_e && err_adf_e >= input_f2_e(k)
+                fir_out2(k) = input_f2(k); 
+            elseif err_fir_e < err_adf_e && err_fir_e < input_f2_e(k)
+                fir_out2(k) = err_fir;
+            else
+                fir_out2(k) = input_f2(k);
+            end      
+        end
         fir_out2 = fir_out2 .* max(1, abs(total_input_f(1:129)) .* abs(input_f2_bak) / (abs(fir_out2) .* abs(input_f_bak) + 10^-10));    
         total_input_f(130:258) = fir_out2;
         
