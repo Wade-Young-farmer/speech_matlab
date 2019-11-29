@@ -148,6 +148,10 @@ dt_count=0;
 dt_count_strict=0;
 
 total_input_f=zeros(1, 258);
+stack_est_ref=zeros(129,6);
+dt_hold_age=40;
+post_over_drive_sm=0;
+
 for i=1:size(x_enframe,1)
     input_buffer(1:128)=input_buffer(129:256);
     input_buffer2(1:128)=input_buffer2(129:256);
@@ -438,6 +442,9 @@ for i=1:size(x_enframe,1)
         end
         
         total_input_f(1:129)=fir_out(1:129);
+        stack_est_ref(:,2:6) = stack_est_ref(:, 1:5);
+        stack_est_ref(:, 1) = fir_est_ref.';
+        
         %  erl
         input_mic_energy=zeros(1,4);
         est_mic_energy=zeros(1,4);
@@ -596,6 +603,7 @@ for i=1:size(x_enframe,1)
             % judge difference is here!
             fir_out(k) = fir_out(k) * nl_coeff(k);
         end
+        nl_coeff1 = nl_coeff;
         
         fir_out_e = abs(fir_out).^2;
         
@@ -694,28 +702,21 @@ for i=1:size(x_enframe,1)
             for k = 3:125
                 F = 1; % track power_ori_mic
             end
-        end 
+        end
     else
         total_input_f(1:129) = input_f_bak;
     end
     
-    % deal with 2nd mic, should not used if not for efficiency purpose
+    % deal with 2nd mic, should not used if not for efficiency purpose    
     if no_ref_count < 500
         input_f2(1:4)=input_f2(1:4).*AEC_HPF_COEFF;
         %retf process
         fir_out2=input_f2;
-        total_input_f(130:258)=fir_out2;
-    else
-        total_input_f(130:258)=input_f2_bak;
-    end
-    
-    if no_ref_count < 500
-        total_input_f(130:258) = total_input_f(130:258) .* max(1, abs(total_input_f(1:129)) .* abs(input_f2_bak) / (abs(total_input_f(130:258)) .* abs(input_f_bak) + 10^-10));    
-        fir_out2 = total_input_f(130:258);
+        fir_out2 = fir_out2 .* max(1, abs(total_input_f(1:129)) .* abs(input_f2_bak) / (abs(fir_out2) .* abs(input_f_bak) + 10^-10));    
+        total_input_f(130:258) = fir_out2;
         
         % nlp
-        % use input_f2_bak instead of input_f2, should be the same, but
-        % should be the same
+        % use input_f2_bak instead of input_f2, should be the same
         % input_r, fir_out2, input_f2_bak, ref_peak，far_end_hold_time, 0, 0
         if ref_peak > 5000
             volumn = 1;
@@ -729,40 +730,40 @@ for i=1:size(x_enframe,1)
         near_psd_smooth2=0.7165*near_psd_smooth2 + (1-0.7165)*near_psd;
         ref_psd_smooth2=0.7165*ref_psd_smooth2 + (1-0.7165)*max(16,ref_psd);
         corr_near_res=conj(input_f2) .* fir_out2;
-        corr_near_res_smooth=0.7165*corr_near_res_smooth + (1-0.7165)*corr_near_res;
-        coh_temp_1=(abs(corr_near_res_smooth).^2)/(res_psd_smooth .* near_psd_smooth + 10^-10);
+        corr_near_res_smooth2=0.7165*corr_near_res_smooth2 + (1-0.7165)*corr_near_res;
+        coh_temp_1=(abs(corr_near_res_smooth2).^2)/(res_psd_smooth .* near_psd_smooth + 10^-10);
         % res_psd_temp=sum(res_psd(3:126));
         % near_psd_temp=sum(near_psd(3:126));
         corr_near_ref=conj(input_f) .* input_r;
-        corr_near_ref_smooth=0.7165*corr_near_ref_smooth + (1-0.7165)*corr_near_ref;
-        coh_temp_2=(abs(corr_near_ref_smooth).^2)/(near_psd_smooth .* ref_psd_smooth + 10^-10);
+        corr_near_ref_smooth2=0.7165*corr_near_ref_smooth2 + (1-0.7165)*corr_near_ref;
+        coh_temp_2=(abs(corr_near_ref_smooth2).^2)/(near_psd_smooth .* ref_psd_smooth + 10^-10);
         
         coh_near_ref_avg=mean(coh_temp_2(5:32));
         coh_near_res_avg=mean(coh_temp_1(5:32)); % near is input here
         
-        if 1 - coh_near_ref_avg < min(0.75, nlp_coeff_temp)
-            nlp_coeff_temp = 1 - coh_near_ref_avg;
+        if 1 - coh_near_ref_avg < min(0.75, nlp_coeff_temp2)
+            nlp_coeff_temp2 = 1 - coh_near_ref_avg;
         end
         
         if coh_near_res_avg > 0.8 && coh_near_ref_avg < 0.3
-            near_state = 1; % 这个state代表什么含义，决定了nlp的效果
-            near_state_hold = 0;
+            near_state2 = 1; % 这个state代表什么含义，决定了nlp的效果
+            near_state_hold2 = 0;
         elseif coh_near_res_avg < 0.75 || coh_near_ref_avg > 0.5
-            if near_state_hold == 3
-                near_state = 0;
+            if near_state_hold2 == 3
+                near_state2 = 0;
             else
-                near_state_hold = near_state_hold + 1;
+                near_state_hold2 = near_state_hold2 + 1;
             end
         end
         
         if far_end_hold_time == 0
-            near_state = 1; % represents someone is talking or speaker is not talking
-            near_state_hold = 0;
+            near_state2 = 1; % represents someone is talking or speaker is not talking
+            near_state_hold2 = 0;
         end
         
-        if nlp_coeff_temp == 1 % represents no far end
-            over_drive=1;
-            if near_state == 1
+        if nlp_coeff_temp2 == 1 % represents no far end
+            over_drive2=1;
+            if near_state2 == 1
                 nl_coeff=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
@@ -774,7 +775,7 @@ for i=1:size(x_enframe,1)
                 nl_coeff_fb_low= 1- coh_near_ref_avg;
             end
         else
-            if volumn == 0 && near_state == 1
+            if volumn == 0 && near_state2 == 1
                 nl_coeff=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
@@ -788,44 +789,44 @@ for i=1:size(x_enframe,1)
             end
         end
         
-        nlp_coeff_temp = min(nlp_coeff_temp+0.0003, 1);
+        nlp_coeff_temp2 = min(nlp_coeff_temp2+0.0003, 1);
         
         % Min track nl_coeff_fb， is not used in none wakeup judge case
-        if nl_coeff_fb_low < min(0.6, nl_coeff_fb_local_min)
-            nl_coeff_fb_min = nl_coeff_fb_low;
-            nl_coeff_fb_local_min = nl_coeff_fb_low;
-            nlp_is_new_min=1;
-            nlp_new_min_ctrl=0;
-            nlp_min_hold_time=0;
+        if nl_coeff_fb_low < min(0.6, nl_coeff_fb_local_min2)
+            nl_coeff_fb_min2 = nl_coeff_fb_low;
+            nl_coeff_fb_local_min2 = nl_coeff_fb_low;
+            nlp_is_new_min2=1;
+            nlp_new_min_ctrl2=0;
+            nlp_min_hold_time2=0;
         else
-            nlp_min_hold_time=nlp_min_hold_time+1;
+            nlp_min_hold_time2=nlp_min_hold_time2+1;
         end
         
-        if nlp_min_hold_time > 100 && nl_coeff_fb_low < min_coeff_tmp
-            min_coeff_tmp = nl_coeff_fb_low;
+        if nlp_min_hold_time2 > 100 && nl_coeff_fb_low < min_coeff_tmp2
+            min_coeff_tmp2 = nl_coeff_fb_low;
         end
            
-        if nlp_min_hold_time > 300 
-            nl_coeff_fb_local_min = min_coeff_tmp;
-            nl_coeff_fb_min = min_coeff_tmp;
-            min_coeff_tmp = 1;
-            nlp_min_hold_time = 150;
+        if nlp_min_hold_time2 > 300 
+            nl_coeff_fb_local_min2 = min_coeff_tmp2;
+            nl_coeff_fb_min2 = min_coeff_tmp2;
+            min_coeff_tmp2 = 1;
+            nlp_min_hold_time2 = 150;
         end
         
-        nl_coeff_fb_local_min = min(nl_coeff_fb_local_min + 0.0004, 1);
-        if nlp_is_new_min == 1
-            nlp_new_min_ctrl = nlp_new_min_ctrl + 1;
+        nl_coeff_fb_local_min2 = min(nl_coeff_fb_local_min2 + 0.0004, 1);
+        if nlp_is_new_min2 == 1
+            nlp_new_min_ctrl2 = nlp_new_min_ctrl2 + 1;
         end
-        if nlp_new_min_ctrl == 2
-            nlp_is_new_min = 0;
-            nlp_new_min_ctrl = 0;
-            over_drive = max(-1.15 / (log(nl_coeff_fb_min + 10^-10) + 10^-10), 1);
+        if nlp_new_min_ctrl2 == 2
+            nlp_is_new_min2 = 0;
+            nlp_new_min_ctrl2 = 0;
+            over_drive2 = max(-1.15 / (log(nl_coeff_fb_min2 + 10^-10) + 10^-10), 1);
         end
         
-        if over_drive < over_drive_smooth
-            over_drive_smooth = 0.99 * over_drive_smooth + 0.01 * over_drive;
+        if over_drive2 < over_drive_smooth2
+            over_drive_smooth2 = 0.99 * over_drive_smooth2 + 0.01 * over_drive2;
         else
-            over_drive_smooth = 0.9 * over_drive_smooth + 0.1 * over_drive;
+            over_drive_smooth2 = 0.9 * over_drive_smooth2 + 0.1 * over_drive2;
         end
         
         nl_coeff = abs(nl_coeff); 
@@ -833,13 +834,59 @@ for i=1:size(x_enframe,1)
             if nl_coeff(k) > nl_coeff_fb
                nl_coeff(k) = (1 -WEB_RTC_AEC_NL_WEIGHT_CURVE(k)) * nl_coeff(k) + WEB_RTC_AEC_NL_WEIGHT_CURVE(k) * nl_coeff_fb;
             end
-            
-            % judge difference is here!
-            fir_out(k) = fir_out(k) * nl_coeff(k);
-        end        
+        end
+        nl_coeff2 = nl_coeff;
+    else
+        total_input_f(130:258)=input_f2_bak;
     end
     
+    if no_ref_count < 500
+        nl_coeff=mean([nl_coeff1;nl_coeff2]);
+        nlp_overdrive = mean(over_drive, over_drive2);
+        
+        % post_process
+        % nlp_overdrive, total_input_f, nl_coeff, dt_flag, dt_st_strict, 2
+        nl_coeff_mean=mean(nl_coeff(5:24));
+        G=0.2; % track nl_coeff_mean, level one minumum
+        nlp_snr = nl_coeff_mean/(G + 10^-10);
+        if dt_flag ~= 0 && nlp_snr > 3
+            dt_hold_age = 40;
+        else
+            dt_hold_age = max(dt_hold_age-1, 0);
+        end
+        
+        if dt_flag ~= 1
+            if dt_hold_age > 0
+                dt_flag = 2;
+            else
+                dt_flag = 0;
+            end
+        end
+        
+        over_drive_tmp = 0.25 * nlp_overdrive / (nlp_snr + 10^-10);
+        post_over_drive_sm = 0.95 * post_over_drive_sm + 0.05 * over_drive_tmp;
+        
+        if dt_flag == 2
+            over_drive_tmp = min(1, post_over_drive_sm);
+        else
+            over_drive_tmp = min(10, post_over_drive_sm);
+        end
+        
+        for k = 1:129
+            tmp_ = nl_coeff(k).^over_drive_tmp;
+            if dt_flag == 2
+                tmp_ = max(tmp_, 0.1);
+            elseif dt_flag == 0
+                tmp_ = max(tmp_, 0.01);
+            end
+            
+            total_input_f(k) = total_input_f(k) * tmp_;
+            total_input_f(k+129) = total_input_f(k+129) * tmp_;
+        end  
+    end
     
-    
+    if no_ref_count > 20
+        dt_flag = 1;
+    end
 end
 end
