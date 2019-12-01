@@ -1,4 +1,4 @@
-function my_aec(mic_name, mic_name_2, ref_name)
+function aec(mic_name, mic_name_2, ref_name)
 Srate=16000;
 file_id=fopen(mic_name, 'r');
 x=fread(file_id, inf, 'int16');
@@ -15,7 +15,7 @@ fclose(file_id);
 x_enframe = enframe(x,128);
 input_buffer=zeros(1, 256);
 
-x2_enframe = enframe(x,128);
+x2_enframe = enframe(x2,128);
 input_buffer2=zeros(1, 256);
 
 r_enframe = enframe(r,128);
@@ -59,6 +59,7 @@ fir_out2=zeros(1, 129);
 power_ori_mic=zeros(1, 129);
 fir_est_ref=zeros(1, 129);
 power_echo=zeros(1,129);
+ref_cnt=0;
 
 erl_peak=zeros(1,4);
 
@@ -101,44 +102,44 @@ min_coeff_tmp2=1;
 
 % 129 bins
 WEB_RTC_AEC_NL_WEIGHT_CURVE = [
-    0.0000,  0.1000,  0.1266,  0.1376,
-    0.1461,  0.1532,  0.1595,  0.1652,
-    0.1704,  0.1753,  0.1799,  0.1842,
-    0.1883,  0.1922,  0.1960,  0.1996,
-    0.2031,  0.2065,  0.2098,  0.2129,
-    0.2160,  0.2191,  0.2220,  0.2249,
-    0.2277,  0.2304,  0.2331,  0.2357,
-    0.2383,  0.2409,  0.2434,  0.2458,
-    0.2482,  0.2506,  0.2529,  0.2552,
-    0.2575,  0.2597,  0.2619,  0.2641,
-    0.2662,  0.2684,  0.2705,  0.2725,
-    0.2746,  0.2766,  0.2786,  0.2806,
-    0.2825,  0.2844,  0.2863,  0.2882,
-    0.2901,  0.2920,  0.2938,  0.2956,
-    0.2974,  0.2992,  0.3010,  0.3027,
-    0.3045,  0.3062,  0.3079,  0.3096,
-    0.3113,  0.3130,  0.3146,  0.3163,
-    0.3179,  0.3195,  0.3211,  0.3227,
-    0.3243,  0.3259,  0.3274,  0.3290,
-    0.3305,  0.3321,  0.3336,  0.3351,
-    0.3366,  0.3381,  0.3396,  0.3411,
-    0.3425,  0.3440,  0.3454,  0.3469,
-    0.3483,  0.3497,  0.3511,  0.3525,
-    0.3539,  0.3553,  0.3567,  0.3581,
-    0.3595,  0.3608,  0.3622,  0.3635,
-    0.3649,  0.3662,  0.3675,  0.3689,
-    0.3702,  0.3715,  0.3728,  0.3741,
-    0.3754,  0.3767,  0.3779,  0.3792,
-    0.3805,  0.3817,  0.3830,  0.3842,
-    0.3855,  0.3867,  0.3879,  0.3892,
-    0.3904,  0.3916,  0.3928,  0.3940,
+    0.0000,  0.1000,  0.1266,  0.1376, ...
+    0.1461,  0.1532,  0.1595,  0.1652, ...
+    0.1704,  0.1753,  0.1799,  0.1842, ...
+    0.1883,  0.1922,  0.1960,  0.1996, ...
+    0.2031,  0.2065,  0.2098,  0.2129, ...
+    0.2160,  0.2191,  0.2220,  0.2249, ...
+    0.2277,  0.2304,  0.2331,  0.2357, ...
+    0.2383,  0.2409,  0.2434,  0.2458, ...
+    0.2482,  0.2506,  0.2529,  0.2552, ...
+    0.2575,  0.2597,  0.2619,  0.2641, ...
+    0.2662,  0.2684,  0.2705,  0.2725, ...
+    0.2746,  0.2766,  0.2786,  0.2806, ...
+    0.2825,  0.2844,  0.2863,  0.2882, ...
+    0.2901,  0.2920,  0.2938,  0.2956, ...
+    0.2974,  0.2992,  0.3010,  0.3027, ...
+    0.3045,  0.3062,  0.3079,  0.3096, ...
+    0.3113,  0.3130,  0.3146,  0.3163, ...
+    0.3179,  0.3195,  0.3211,  0.3227, ...
+    0.3243,  0.3259,  0.3274,  0.3290, ...
+    0.3305,  0.3321,  0.3336,  0.3351, ...
+    0.3366,  0.3381,  0.3396,  0.3411, ...
+    0.3425,  0.3440,  0.3454,  0.3469, ...
+    0.3483,  0.3497,  0.3511,  0.3525, ...
+    0.3539,  0.3553,  0.3567,  0.3581, ...
+    0.3595,  0.3608,  0.3622,  0.3635, ...
+    0.3649,  0.3662,  0.3675,  0.3689, ...
+    0.3702,  0.3715,  0.3728,  0.3741, ...
+    0.3754,  0.3767,  0.3779,  0.3792, ...
+    0.3805,  0.3817,  0.3830,  0.3842, ...
+    0.3855,  0.3867,  0.3879,  0.3892, ...
+    0.3904,  0.3916,  0.3928,  0.3940, ...
     0.3952,  0.3964,  0.3976,  0.3988, 0.4000];
 
-DOUBLETALK_BAND_TABLE = [ 9, 11, 12, 15, 16, 18, 19, 21, 22, 24, 25, 27, 28, 
-                          31, 32, 34, 35, 37, 38, 40, 41, 43, 44, 47, 48, 50, 
-                          51, 53, 54, 56, 57, 59, 60, 63, 64, 66, 67, 69, 70, 
-                          72, 73, 75, 76, 79, 80, 82, 83, 85, 86, 88, 89, 91, 
-                          92, 95, 96, 98, 99, 101, 102, 104, 105, 107, 108, 111,
+DOUBLETALK_BAND_TABLE = [ 9, 11, 12, 15, 16, 18, 19, 21, 22, 24, 25, 27, 28, ... 
+                          31, 32, 34, 35, 37, 38, 40, 41, 43, 44, 47, 48, 50, ... 
+                          51, 53, 54, 56, 57, 59, 60, 63, 64, 66, 67, 69, 70, ...
+                          72, 73, 75, 76, 79, 80, 82, 83, 85, 86, 88, 89, 91, ...
+                          92, 95, 96, 98, 99, 101, 102, 104, 105, 107, 108, 111, ...
                           112, 114, 115, 117, 118, 120, 121, 123, 124, 126];
 DOUBLETALK_BAND_TABLE = DOUBLETALK_BAND_TABLE +1;
 dt_spk_peak=zeros(1, 37);
@@ -158,7 +159,11 @@ mse_fir2=zeros(1, 129);
 mse_adf2=zeros(1, 129);
 mse_mic2=zeros(1, 129);
 
+hh=waitbar(0, "data is being processed");
+pcm_size=size(x_enframe,1);
 for i=1:size(x_enframe,1)
+    str=[num2str(i), ' / ', num2str(pcm_size), ' processed']; 
+    waitbar(i/pcm_size, hh, str); 
     input_buffer(1:128)=input_buffer(129:256);
     input_buffer2(1:128)=input_buffer2(129:256);
     input_buffer(129:256)=x_enframe(i,:);
@@ -176,6 +181,7 @@ for i=1:size(x_enframe,1)
     ref_buffer(129:256)=r_enframe(i,:);
     ref_f=fft(ref_buffer);
     ref_f=ref_f(1:129);
+    input_r=ref_f;
     
     % Only apply to single-channel reference signal
     ref_t=r_enframe(i,:);
@@ -198,7 +204,7 @@ for i=1:size(x_enframe,1)
         detect_far_end_buffer(6)=magnitude_tmp;
     end
     
-    A=1; % A��һ��ns��ֵ, ��detect_far_end_buffer(1)�õ�
+    A=1; % A锟斤拷一锟斤拷ns锟斤拷值, 锟斤拷detect_far_end_buffer(1)锟矫碉拷
     if detect_far_end_buffer(1) > max(10, 2*A)
         far_end_talk_flag = 1;
         far_end_hold_time = 20;
@@ -225,7 +231,7 @@ for i=1:size(x_enframe,1)
             energy_group_peak(j) = 0.9048 * energy_group_peak(j) + (1-0.9048) * energy_group(j);
         end
         
-        C=1; % energy_group(j) ���ٳ�һ��ref�Ӵ������ns��ֵ
+        C=1; % energy_group(j) 锟斤拷锟劫筹拷一锟斤拷ref锟接达拷锟斤拷锟斤拷锟??ns锟斤拷值
     end
     
     stack_ref_low(:, 2:20)=stack_ref_low(:, 1:19);
@@ -307,7 +313,7 @@ for i=1:size(x_enframe,1)
                 tmp = 20;
             end
             
-            B=1; % B��һ��ns��ֵ��ÿ��mic��ÿ��Ƶ�㶼����Ƴ�һ��
+            B=1; % B锟斤拷一锟斤拷ns锟斤拷值锟斤拷每锟斤拷mic锟斤拷每锟斤拷频锟姐都锟斤拷锟斤拷瞥锟揭伙拷锟??
             if input_power * erl_ratio(subband_index) > tmp * B && filter_freeze == 0 % tmp is for dt state threshold
                 adf_coeff_low(k,:) = adf_coeff_low(k,:) + norm_step * err_adf' * stack_ref_low(k,:);
                 fir_update_flag(k)=1;
@@ -323,7 +329,7 @@ for i=1:size(x_enframe,1)
                 early_out=adf_early_tmp;
             else
                 min_power_early=abs(fir_early_tmp)^2;
-                early_out=fir_early_out;
+                early_out=fir_early_tmp;
             end
             
             if err_fir_e > err_adf_e
@@ -353,15 +359,15 @@ for i=1:size(x_enframe,1)
         
         % High channel copied from low
         for k=33:128
-            est_fir_early=stack_ref_hi(k,1:4) * fir_coeff_hi(k,1:4)';
-            est_adf_early=stack_ref_hi(k,1:4) * adf_coeff_hi(k,1:4)';
-            est_fir=stack_ref_hi(k,:) * fir_coeff_hi(k,:)'; % Matrix Mul, waring of not a scalar
-            est_adf=stack_ref_hi(k,:) * adf_coeff_hi(k,:)';
+            est_fir_early=stack_ref_hi(k-32,1:4) * fir_coeff_hi(k-32,1:4)';
+            est_adf_early=stack_ref_hi(k-32,1:4) * adf_coeff_hi(k-32,1:4)';
+            est_fir=stack_ref_hi(k-32,:) * fir_coeff_hi(k-32,:)'; % Matrix Mul, waring of not a scalar
+            est_adf=stack_ref_hi(k-32,:) * adf_coeff_hi(k-32,:)';
             est_fir_e = abs(est_fir).^2;
             est_adf_e = abs(est_adf).^2;
             err_fir=input_f(k)-est_fir;
             err_adf=input_f(k)-est_adf;
-            input_power=sum(abs(stack_ref_hi(k,:)).^2);
+            input_power=sum(abs(stack_ref_hi(k-32,:)).^2);
             norm_step=0.5/(input_power+0.01);
             err_fir_e=abs(err_fir).^2;
             err_adf_e=abs(err_adf).^2;
@@ -370,24 +376,24 @@ for i=1:size(x_enframe,1)
             mse_mic(k)=0.9735*mse_mic(k)+(1-0.9735)*(abs(input_f(k)).^2);
             
             if mse_adf(k) > mse_mic(k) * 8
-                adf_coeff_hi(k,:)=0;
+                adf_coeff_hi(k-32,:)=0;
                 mse_adf(k)=mse_mic(k);
                 err_adf=input_f(k);
             else
                 if mse_adf(k) < min(0.125 * mse_mic(k), 0.5 * mse_fir(k)) && ref_cnt == 0
-                    fir_coeff_hi(k,:)=adf_coeff_hi(k,:);
+                    fir_coeff_hi(k-32,:)=adf_coeff_hi(k-32,:);
                     mse_fir(k)=mse_adf(k);
                     err_fir=err_adf;
                 end
             end
             
             if mse_fir(k) > mse_mic(k) * 8 && ref_cnt == 0
-                fir_coeff_hi(k,:)=0;
+                fir_coeff_hi(k-32,:)=0;
                 mse_fir(k)=mse_mic(k);
                 err_fir=input_f(k);
             else
                 if mse_fir(k) < min(0.125 * mse_mic(k), 0.5 * mse_adf(k))
-                    adf_coeff_hi(k,:)=fir_coeff_hi(k,:);
+                    adf_coeff_hi(k-32,:)=fir_coeff_hi(k-32,:);
                     mse_adf(k)=mse_fir(k);
                     err_adf=err_fir;
                 end
@@ -405,9 +411,9 @@ for i=1:size(x_enframe,1)
                 tmp = 20;
             end
             
-            B=1; % B��һ��ns��ֵ��ÿ��mic��ÿ��Ƶ�㶼����Ƴ�һ��
+            B=1; % B锟斤拷一锟斤拷ns锟斤拷值锟斤拷每锟斤拷mic锟斤拷每锟斤拷频锟姐都锟斤拷锟斤拷瞥锟揭伙拷锟??
             if input_power * erl_ratio(subband_index) > tmp * B && filter_freeze == 0
-                adf_coeff_hi(k,:) = adf_coeff_hi(k,:) + norm_step * err_adf' * stack_ref_hi(k,:);
+                adf_coeff_hi(k-32,:) = adf_coeff_hi(k-32,:) + norm_step * err_adf' * stack_ref_hi(k-32,:);
                 fir_update_flag(k)=1;
             else
                 fir_update_flag(k)=0;
@@ -421,7 +427,7 @@ for i=1:size(x_enframe,1)
                 early_out=adf_early_tmp;
             else
                 min_power_early=abs(fir_early_tmp)^2;
-                early_out=fir_early_out;
+                early_out=fir_early_tmp;
             end
             
             if err_fir_e > err_adf_e
@@ -487,7 +493,7 @@ for i=1:size(x_enframe,1)
         end
         
         % nlp
-        % input_r, fir_out, input_f, ref_peak��far_end_hold_time, 1, 0
+        % input_r, fir_out, input_f, ref_peak锟斤拷far_end_hold_time, 1, 0
         if ref_peak > 5000
             volumn = 1;
         else
@@ -502,12 +508,12 @@ for i=1:size(x_enframe,1)
         ref_psd_smooth=0.7165*ref_psd_smooth + (1-0.7165)*max(16,ref_psd);
         corr_near_res=conj(input_f) .* fir_out;
         corr_near_res_smooth=0.7165*corr_near_res_smooth + (1-0.7165)*corr_near_res;
-        coh_temp_1=(abs(corr_near_res_smooth).^2)/(res_psd_smooth .* near_psd_smooth + 10^-10);
+        coh_temp_1=(abs(corr_near_res_smooth).^2) ./ (res_psd_smooth .* near_psd_smooth + 10^-10);
         % res_psd_temp=sum(res_psd(3:126));
         % near_psd_temp=sum(near_psd(3:126));
         corr_near_ref=conj(input_f) .* input_r;
         corr_near_ref_smooth=0.7165*corr_near_ref_smooth + (1-0.7165)*corr_near_ref;
-        coh_temp_2=(abs(corr_near_ref_smooth).^2)/(near_psd_smooth .* ref_psd_smooth + 10^-10);
+        coh_temp_2=(abs(corr_near_ref_smooth).^2) ./ (near_psd_smooth .* ref_psd_smooth + 10^-10);
         
         coh_near_ref_avg=mean(coh_temp_2(5:32));
         coh_near_res_avg=mean(coh_temp_1(5:32)); % near is input here
@@ -517,7 +523,7 @@ for i=1:size(x_enframe,1)
         end
         
         if coh_near_res_avg > 0.8 && coh_near_ref_avg < 0.3
-            near_state = 1; % ���state����ʲô���壬������nlp��Ч��
+            near_state = 1; % 锟斤拷锟??state锟斤拷锟斤拷什么锟斤拷锟藉，锟斤拷锟斤拷锟斤拷nlp锟斤拷效锟斤拷
             near_state_hold = 0;
         elseif coh_near_res_avg < 0.75 || coh_near_ref_avg > 0.5
             if near_state_hold == 3
@@ -538,9 +544,9 @@ for i=1:size(x_enframe,1)
                 nl_coeff=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
-                % ѡnear_res
+                % 选near_res
             else
-                % ѡ1- near_far
+                % 选1- near_far
                 nl_coeff=1- coh_temp_2;
                 nl_coeff_fb=1- coh_near_ref_avg;
                 nl_coeff_fb_low= 1- coh_near_ref_avg;
@@ -550,9 +556,9 @@ for i=1:size(x_enframe,1)
                 nl_coeff=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
-                % ѡ near_res
+                % 选 near_res
             else
-                % ѡ min(near_res, 1 - near_far)
+                % 选 min(near_res, 1 - near_far)
                 nl_coeff=min(coh_temp_1, 1-coh_temp_2);
                 nl_coeff_temp_array=sort(nl_coeff(5:32));
                 nl_coeff_fb = nl_coeff_temp_array(21);
@@ -562,7 +568,7 @@ for i=1:size(x_enframe,1)
         
         nlp_coeff_temp = min(nlp_coeff_temp+0.0003, 1);
         
-        % Min track nl_coeff_fb�� is not used in none wakeup judge case
+        % Min track nl_coeff_fb锟斤拷 is not used in none wakeup judge case
         if nl_coeff_fb_low < min(0.6, nl_coeff_fb_local_min)
             nl_coeff_fb_min = nl_coeff_fb_low;
             nl_coeff_fb_local_min = nl_coeff_fb_low;
@@ -630,10 +636,10 @@ for i=1:size(x_enframe,1)
             dt_mic_psd = dt_mic_psd - 10 * dt_ns_psd;
             dt_mic_psd = max(dt_mic_psd, 0);
             
-            if dt_spk_peak(j) < dt_spk_psd(j)
-                dt_spk_peak(j) = dt_spk_psd(j);
+            if dt_spk_peak(j) < dt_spk_psd
+                dt_spk_peak(j) = dt_spk_psd;
             else
-                dt_spk_peak(j) = 0.7 * dt_spk_peak(j) + 0.3 * dt_spk_peak(j);
+                dt_spk_peak(j) = 0.7 * dt_spk_peak(j) + 0.3 * dt_spk_psd;
             end
             
             if freq >= 0 && freq < 600 
@@ -699,7 +705,7 @@ for i=1:size(x_enframe,1)
                 dt_flag_strict = 2;
             end
             
-            if far_end_hold_time == 0;
+            if far_end_hold_time == 0
                 dt_flag_strict = 1;
             end
         end
@@ -720,17 +726,17 @@ for i=1:size(x_enframe,1)
         % input_f2, stack_est_ref, fir_out2, fir_update_flag
         input_f2_e = abs(input_f2).^2;
         for k =1:129
-            est_ref_fir = stack_est_ref(k,:) * fir_coeff_2';
-            est_ref_adf = stack_est_ref(k,:) * adf_coeff_2';
-            est_ref_fir_e = abs(est_ref_fir)^2;
-            est_ref_adf_e = abds(est_ref_adf)^2;
+            est_ref_fir = stack_est_ref(k,:) * fir_coeff_2(k, :)';
+            est_ref_adf = stack_est_ref(k,:) * adf_coeff_2(k, :)';
+            est_ref_fir_e = abs(est_ref_fir).^2;
+            est_ref_adf_e = abs(est_ref_adf).^2;
             err_fir = input_f2(k) - est_ref_fir;
             err_adf = input_f2(k) - est_ref_adf;
-            mu = 0.5 / (sum(abs(stack_est_ref(k, :).^2) + 0.01);
+            mu = 0.5 / (sum(abs(stack_est_ref(k, :).^2) + 0.01));
             err_fir_e = abs(err_fir).^2;
             err_adf_e = abs(err_adf).^2;
-            mse_fir2(k) = 0.9608 * mse_fir2(k) + (1-0.9608) * err_fir_e(k);
-            mse_adf2(k) = 0.9608 * mse_adf2(k) + (1-0.9608) * err_adf_e(k);
+            mse_fir2(k) = 0.9608 * mse_fir2(k) + (1-0.9608) * err_fir_e;
+            mse_adf2(k) = 0.9608 * mse_adf2(k) + (1-0.9608) * err_adf_e;
             mse_mic2(k) = 0.9608 * mse_mic2(k) + (1-0.9608) * input_f2_e(k);
             
             if mse_adf2(k) > mse_mic2(k) * 8
@@ -772,7 +778,7 @@ for i=1:size(x_enframe,1)
         
         % nlp
         % use input_f2_bak instead of input_f2, should be the same
-        % input_r, fir_out2, input_f2_bak, ref_peak��far_end_hold_time, 0, 0
+        % input_r, fir_out2, input_f2_bak, ref_peak锟斤拷far_end_hold_time, 0, 0
         if ref_peak > 5000
             volumn = 1;
         else
@@ -786,12 +792,12 @@ for i=1:size(x_enframe,1)
         ref_psd_smooth2=0.7165*ref_psd_smooth2 + (1-0.7165)*max(16,ref_psd);
         corr_near_res=conj(input_f2) .* fir_out2;
         corr_near_res_smooth2=0.7165*corr_near_res_smooth2 + (1-0.7165)*corr_near_res;
-        coh_temp_1=(abs(corr_near_res_smooth2).^2)/(res_psd_smooth .* near_psd_smooth + 10^-10);
+        coh_temp_1=(abs(corr_near_res_smooth2).^2) ./ (res_psd_smooth .* near_psd_smooth + 10^-10);
         % res_psd_temp=sum(res_psd(3:126));
         % near_psd_temp=sum(near_psd(3:126));
         corr_near_ref=conj(input_f) .* input_r;
         corr_near_ref_smooth2=0.7165*corr_near_ref_smooth2 + (1-0.7165)*corr_near_ref;
-        coh_temp_2=(abs(corr_near_ref_smooth2).^2)/(near_psd_smooth .* ref_psd_smooth + 10^-10);
+        coh_temp_2=(abs(corr_near_ref_smooth2).^2) ./ (near_psd_smooth .* ref_psd_smooth + 10^-10);
         
         coh_near_ref_avg=mean(coh_temp_2(5:32));
         coh_near_res_avg=mean(coh_temp_1(5:32)); % near is input here
@@ -801,7 +807,7 @@ for i=1:size(x_enframe,1)
         end
         
         if coh_near_res_avg > 0.8 && coh_near_ref_avg < 0.3
-            near_state2 = 1; % ���state����ʲô���壬������nlp��Ч��
+            near_state2 = 1; % 锟斤拷锟??state锟斤拷锟斤拷什么锟斤拷锟藉，锟斤拷锟斤拷锟斤拷nlp锟斤拷效锟斤拷
             near_state_hold2 = 0;
         elseif coh_near_res_avg < 0.75 || coh_near_ref_avg > 0.5
             if near_state_hold2 == 3
@@ -822,9 +828,9 @@ for i=1:size(x_enframe,1)
                 nl_coeff=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
-                % ѡnear_res
+                % 选near_res
             else
-                % ѡ1- near_far
+                % 选1- near_far
                 nl_coeff=1- coh_temp_2;
                 nl_coeff_fb=1- coh_near_ref_avg;
                 nl_coeff_fb_low= 1- coh_near_ref_avg;
@@ -834,9 +840,9 @@ for i=1:size(x_enframe,1)
                 nl_coeff=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
-                % ѡ near_res
+                % 选 near_res
             else
-                % ѡ min(near_res, 1 - near_far)
+                % 选 min(near_res, 1 - near_far)
                 nl_coeff=min(coh_temp_1, 1-coh_temp_2);
                 nl_coeff_temp_array=sort(nl_coeff(5:32));
                 nl_coeff_fb = nl_coeff_temp_array(21);
@@ -846,7 +852,7 @@ for i=1:size(x_enframe,1)
         
         nlp_coeff_temp2 = min(nlp_coeff_temp2+0.0003, 1);
         
-        % Min track nl_coeff_fb�� is not used in none wakeup judge case
+        % Min track nl_coeff_fb锟斤拷 is not used in none wakeup judge case
         if nl_coeff_fb_low < min(0.6, nl_coeff_fb_local_min2)
             nl_coeff_fb_min2 = nl_coeff_fb_low;
             nl_coeff_fb_local_min2 = nl_coeff_fb_low;
@@ -897,7 +903,7 @@ for i=1:size(x_enframe,1)
     
     if no_ref_count < 500
         nl_coeff=mean([nl_coeff1;nl_coeff2]);
-        nlp_overdrive = mean(over_drive, over_drive2);
+        nlp_overdrive = mean([over_drive, over_drive2]);
         
         % post_process
         % nlp_overdrive, total_input_f, nl_coeff, dt_flag, dt_st_strict, 2
@@ -944,4 +950,5 @@ for i=1:size(x_enframe,1)
         dt_flag = 1;
     end
 end
+close(hh);
 end
