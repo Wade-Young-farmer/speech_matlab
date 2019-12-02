@@ -159,7 +159,7 @@ mse_fir2=zeros(1, 129);
 mse_adf2=zeros(1, 129);
 mse_mic2=zeros(1, 129);
 
-hh=waitbar(0, "data is being processed");
+hh=waitbar(0, 'data is being processed');
 pcm_size=size(x_enframe,1);
 for i=1:size(x_enframe,1)
     str=[num2str(i), ' / ', num2str(pcm_size), ' processed']; 
@@ -204,7 +204,7 @@ for i=1:size(x_enframe,1)
         detect_far_end_buffer(6)=magnitude_tmp;
     end
     
-    A=1; % A锟斤拷一锟斤拷ns锟斤拷值, 锟斤拷detect_far_end_buffer(1)锟矫碉拷
+    A=1; % A????????????s???????, ?????etect_far_end_buffer(1)??????
     if detect_far_end_buffer(1) > max(10, 2*A)
         far_end_talk_flag = 1;
         far_end_hold_time = 20;
@@ -231,7 +231,7 @@ for i=1:size(x_enframe,1)
             energy_group_peak(j) = 0.9048 * energy_group_peak(j) + (1-0.9048) * energy_group(j);
         end
         
-        C=1; % energy_group(j) 锟斤拷锟劫筹拷一锟斤拷ref锟接达拷锟斤拷锟斤拷锟??ns锟斤拷值
+        C=1; % energy_group(j) ???????????????????ef???��????????????????ns???????
     end
     
     stack_ref_low(:, 2:20)=stack_ref_low(:, 1:19);
@@ -313,7 +313,7 @@ for i=1:size(x_enframe,1)
                 tmp = 20;
             end
             
-            B=1; % B锟斤拷一锟斤拷ns锟斤拷值锟斤拷每锟斤拷mic锟斤拷每锟斤拷频锟姐都锟斤拷锟斤拷瞥锟揭伙拷锟??
+            B=1; % B????????????s???????????????????ic?????????????????????????????????????????
             if input_power * erl_ratio(subband_index) > tmp * B && filter_freeze == 0 % tmp is for dt state threshold
                 adf_coeff_low(k,:) = adf_coeff_low(k,:) + norm_step * err_adf' * stack_ref_low(k,:);
                 fir_update_flag(k)=1;
@@ -411,7 +411,7 @@ for i=1:size(x_enframe,1)
                 tmp = 20;
             end
             
-            B=1; % B锟斤拷一锟斤拷ns锟斤拷值锟斤拷每锟斤拷mic锟斤拷每锟斤拷频锟姐都锟斤拷锟斤拷瞥锟揭伙拷锟??
+            B=1; % B????????????s???????????????????ic?????????????????????????????????????????
             if input_power * erl_ratio(subband_index) > tmp * B && filter_freeze == 0
                 adf_coeff_hi(k-32,:) = adf_coeff_hi(k-32,:) + norm_step * err_adf' * stack_ref_hi(k-32,:);
                 fir_update_flag(k)=1;
@@ -493,7 +493,7 @@ for i=1:size(x_enframe,1)
         end
         
         % nlp
-        % input_r, fir_out, input_f, ref_peak锟斤拷far_end_hold_time, 1, 0
+        % input_r, fir_out, input_f, ref_peak?????ar_end_hold_time, 1, 0
         if ref_peak > 5000
             volumn = 1;
         else
@@ -523,8 +523,7 @@ for i=1:size(x_enframe,1)
         end
         
         if coh_near_res_avg > 0.8 && coh_near_ref_avg < 0.3
-            near_state = 1; % 锟斤拷锟??state锟斤拷锟斤拷什么锟斤拷锟藉，锟斤拷锟斤拷锟斤拷nlp锟斤拷效锟斤拷
-            near_state_hold = 0;
+            near_state = 1; % ?????????state????????????????????????????????????????lp????????????            near_state_hold = 0;
         elseif coh_near_res_avg < 0.75 || coh_near_ref_avg > 0.5
             if near_state_hold == 3
                 near_state = 0;
@@ -544,9 +543,9 @@ for i=1:size(x_enframe,1)
                 nl_coeff=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
-                % 选near_res
+                % ??ear_res
             else
-                % 选1- near_far
+                % ??- near_far
                 nl_coeff=1- coh_temp_2;
                 nl_coeff_fb=1- coh_near_ref_avg;
                 nl_coeff_fb_low= 1- coh_near_ref_avg;
@@ -556,9 +555,9 @@ for i=1:size(x_enframe,1)
                 nl_coeff=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
-                % 选 near_res
+                % ??near_res
             else
-                % 选 min(near_res, 1 - near_far)
+                % ??min(near_res, 1 - near_far)
                 nl_coeff=min(coh_temp_1, 1-coh_temp_2);
                 nl_coeff_temp_array=sort(nl_coeff(5:32));
                 nl_coeff_fb = nl_coeff_temp_array(21);
@@ -568,7 +567,7 @@ for i=1:size(x_enframe,1)
         
         nlp_coeff_temp = min(nlp_coeff_temp+0.0003, 1);
         
-        % Min track nl_coeff_fb锟斤拷 is not used in none wakeup judge case
+        % Min track nl_coeff_fb?????is not used in none wakeup judge case
         if nl_coeff_fb_low < min(0.6, nl_coeff_fb_local_min)
             nl_coeff_fb_min = nl_coeff_fb_low;
             nl_coeff_fb_local_min = nl_coeff_fb_low;
@@ -778,7 +777,7 @@ for i=1:size(x_enframe,1)
         
         % nlp
         % use input_f2_bak instead of input_f2, should be the same
-        % input_r, fir_out2, input_f2_bak, ref_peak锟斤拷far_end_hold_time, 0, 0
+        % input_r, fir_out2, input_f2_bak, ref_peak?????ar_end_hold_time, 0, 0
         if ref_peak > 5000
             volumn = 1;
         else
@@ -807,8 +806,7 @@ for i=1:size(x_enframe,1)
         end
         
         if coh_near_res_avg > 0.8 && coh_near_ref_avg < 0.3
-            near_state2 = 1; % 锟斤拷锟??state锟斤拷锟斤拷什么锟斤拷锟藉，锟斤拷锟斤拷锟斤拷nlp锟斤拷效锟斤拷
-            near_state_hold2 = 0;
+            near_state2 = 1; % ?????????state????????????????????????????????????????lp????????????            near_state_hold2 = 0;
         elseif coh_near_res_avg < 0.75 || coh_near_ref_avg > 0.5
             if near_state_hold2 == 3
                 near_state2 = 0;
@@ -828,9 +826,9 @@ for i=1:size(x_enframe,1)
                 nl_coeff=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
-                % 选near_res
+                % ??ear_res
             else
-                % 选1- near_far
+                % ??- near_far
                 nl_coeff=1- coh_temp_2;
                 nl_coeff_fb=1- coh_near_ref_avg;
                 nl_coeff_fb_low= 1- coh_near_ref_avg;
@@ -840,9 +838,9 @@ for i=1:size(x_enframe,1)
                 nl_coeff=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
-                % 选 near_res
+                % ??near_res
             else
-                % 选 min(near_res, 1 - near_far)
+                % ??min(near_res, 1 - near_far)
                 nl_coeff=min(coh_temp_1, 1-coh_temp_2);
                 nl_coeff_temp_array=sort(nl_coeff(5:32));
                 nl_coeff_fb = nl_coeff_temp_array(21);
@@ -852,7 +850,7 @@ for i=1:size(x_enframe,1)
         
         nlp_coeff_temp2 = min(nlp_coeff_temp2+0.0003, 1);
         
-        % Min track nl_coeff_fb锟斤拷 is not used in none wakeup judge case
+        % Min track nl_coeff_fb?????is not used in none wakeup judge case
         if nl_coeff_fb_low < min(0.6, nl_coeff_fb_local_min2)
             nl_coeff_fb_min2 = nl_coeff_fb_low;
             nl_coeff_fb_local_min2 = nl_coeff_fb_low;

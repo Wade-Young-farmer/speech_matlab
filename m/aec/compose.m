@@ -1,4 +1,4 @@
-function [x_f, x2_f, r_f]=hpf(mic_name, mic_name_2, ref_name)
+function [x_out, x2_out]=compose(input1, input2)
 filter_coeff=[-0.000030328878, -0.000030577072, -0.000031071936, -0.000031810440, ...
         -0.000032788081, -0.000033998941, -0.000035435750, -0.000037089977, ...
         -0.000038951924, -0.000041010841, -0.000043255049, -0.000045672075, ...
@@ -191,85 +191,37 @@ filter_coeff=[-0.000030328878, -0.000030577072, -0.000031071936, -0.000031810440
         -0.000045672075, -0.000043255049, -0.000041010841, -0.000038951924, ...
         -0.000037089977, -0.000035435750, -0.000033998941, -0.000032788081, ...
         -0.000031810440, -0.000031071936, -0.000030577072, -0.000030328878];
-Srate=16000;
-file_id=fopen(mic_name, 'r');
-x=fread(file_id, inf, 'int16');
-fclose(file_id);
+frame_size=size(input1, 1);
+x_out=zeros(frame_size, 128);
+x2_out=zeros(frame_size, 128);
 
-file_id=fopen(mic_name_2, 'r');
-x2=fread(file_id, inf, 'int16');
-fclose(file_id);
+buf_1=zeros(1, 768);
+buf_2=zeros(1, 768);
 
-file_id=fopen(ref_name, 'r');
-r=fread(file_id, inf, 'int16');
-fclose(file_id);
-
-x_enframe = enframe(x,128);
-x2_enframe = enframe(x2,128);
-r_enframe = enframe(r,128);
-
-frame_size=size(x_enframe, 1);
-x_f=zeros(frame_size, 129);
-x2_f=zeros(frame_size, 129);
-r_f=zeros(frame_size, 129);
-
-b=[1, -2, 1];
-a=[1, -1.95998, 0.9615];
-d=[2, -2];
-c=[1, -0.96148];
-g = [0.0013094, 367.1433];
-b0 = g(1) * g(2) * conv(b, d);
-a0 = conv(a, c);
-
-buf_1 = zeros(1, 768);
-buf_2 = zeros(1, 768);
-buf_r = zeros(1, 768);
 
 for i=1:frame_size
-    input = x_enframe(i,:);
-    input = filter(b0, a0, input);
-    x_enframe(i,:)=input;
-    
-    input2=x2_enframe(i,:);
-    input2=filter(b0, a0, input2);
-    x2_enframe(i,:)=input2;
-    
-    ref=r_enframe(i,:);
-    ref=filter(b0, a0, ref);
-    r_enframe(i,:)=ref;
-    
-    buf_1(641:768)=input;
-    temp = filter_coeff .* buf_1;
-    temp2 = zeros(1, 256);
-    for j = 1:256
-        temp2(j) = temp(j) + temp(j + 256) + temp(j + 512);
-    end
+    f1=input1(i,:);
+    temp=zeros(1,256);
+    temp(1:129)=f1;
+    temp(130:256)=conj(f1(128:-1:2));
+    t1=ifft(temp) * 256;
+    temp2 = [t1, t1, t1];
+    buf_1 = buf_1 + filter_coeff .* temp2;
+    output1 = buf_1(1:128)*128;
+    x_out(i, :)=output1;
     buf_1(1:640)=buf_1(129:768);
-    input_f=fft(temp2);
-    input_f=input_f(1:129);
-    x_f(i,:)=input_f;
+    buf_1(641:768)=0;
     
-    buf_2(641:768)=input2;
-    temp = filter_coeff .* buf_2;
-    temp2 = zeros(1, 256);
-    for j = 1:256
-        temp2(j) = temp(j) + temp(j + 256) + temp(j + 512);
-    end
+    f2=input2(i,:);
+    temp=zeros(1,256);
+    temp(1:129)=f2;
+    temp(130:256)=conj(f2(128:-1:2));
+    t2=ifft(temp) * 256;
+    temp2 = [t2, t2, t2];
+    buf_2 = buf_2 + filter_coeff .* temp2;
+    output2 = buf_2(1:128)*128;
+    x2_out(i, :)=output2;
     buf_2(1:640)=buf_2(129:768);
-    input_f=fft(temp2);
-    input_f=input_f(1:129);
-    x2_f(i,:)=input_f;
-    
-    buf_r(641:768)=ref;
-    temp = filter_coeff .* buf_r;
-    temp2 = zeros(1, 256);
-    for j = 1:256
-        temp2(j) = temp(j) + temp(j + 256) + temp(j + 512);
-    end
-    buf_r(1:640)=buf_r(129:768);
-    input_f=fft(temp2);
-    input_f=input_f(1:129);
-    r_f(i,:)=input_f;
+    buf_2(641:768)=0;    
 end
-
 end
