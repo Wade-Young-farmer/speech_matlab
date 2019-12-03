@@ -1,26 +1,5 @@
-function aec(mic_name, mic_name_2, ref_name)
-Srate=16000;
-file_id=fopen(mic_name, 'r');
-x=fread(file_id, inf, 'int16');
-fclose(file_id);
-
-file_id=fopen(mic_name_2, 'r');
-x2=fread(file_id, inf, 'int16');
-fclose(file_id);
-
-file_id=fopen(ref_name, 'r');
-r=fread(file_id, inf, 'int16');
-fclose(file_id);
-
-x_enframe = enframe(x,128);
-input_buffer=zeros(1, 256);
-
-x2_enframe = enframe(x2,128);
-input_buffer2=zeros(1, 256);
-
-r_enframe = enframe(r,128);
-ref_buffer=zeros(1, 256);
-
+function total_input_f=aec(mic_name, mic_name_2, ref_name)
+[x_enframe, x2_enframe, r_enframe, x_f, x2_f, r_f]=hpf(mic_name, mic_name_2, ref_name);
 ref_peak=0;
 smooth_factor1=1-exp(-1/10);
 peak_hold_frame=0;
@@ -159,28 +138,21 @@ mse_fir2=zeros(1, 129);
 mse_adf2=zeros(1, 129);
 mse_mic2=zeros(1, 129);
 
+D=1;
+E=1;
+
 hh=waitbar(0, 'data is being processed');
 pcm_size=size(x_enframe,1);
 for i=1:size(x_enframe,1)
     str=[num2str(i), ' / ', num2str(pcm_size), ' processed']; 
     waitbar(i/pcm_size, hh, str); 
-    input_buffer(1:128)=input_buffer(129:256);
-    input_buffer2(1:128)=input_buffer2(129:256);
-    input_buffer(129:256)=x_enframe(i,:);
-    input_buffer2(129:256)=x2_enframe(i,:);
-    input_f=fft(input_buffer);
-    input_f2=fft(input_buffer2);
-    input_f=input_f(1:129);
-    input_f2=input_f2(1:129);
-    input_f_bak = input_f;
-    input_f2_bak = input_f2;
     input_t=x_enframe(i,:);
     input_t2=x2_enframe(i,:);
-    
-    ref_buffer(1:128)=ref_buffer(129:256);
-    ref_buffer(129:256)=r_enframe(i,:);
-    ref_f=fft(ref_buffer);
-    ref_f=ref_f(1:129);
+    input_f=x_f(i,:);
+    input_f2=x2_f(i,:);
+    input_f_bak=input_f;
+    input_f2_bak=input_f2;
+    ref_f=r_f(i,:);
     input_r=ref_f;
     
     % Only apply to single-channel reference signal
