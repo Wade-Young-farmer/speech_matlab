@@ -78,5 +78,4 @@ for i=1:frame_size
     input_f=input_f(1:129);
     r_f(i,:)=input_f;
 end
-
 end

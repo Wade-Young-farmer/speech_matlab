@@ -1,7 +1,6 @@
 function total_input_f_pcm=aec(mic_name, mic_name_2, ref_name, filter_coeff)
 [x_enframe, x2_enframe, r_enframe, x_f, x2_f, r_f]=hpf(mic_name, mic_name_2, ref_name, filter_coeff);
 ref_peak=0;
-smooth_factor1=1-exp(-1/10);
 peak_hold_frame=0;
 
 detect_far_end_buffer=zeros(1, 6);
@@ -140,6 +139,16 @@ mse_mic2=zeros(1, 129);
 
 D=1;
 E=1;
+C=1;
+
+spk_t_ns_parameters = initial(16, 100, 200);
+for i=1:4
+    energy_group_parameters(i)=initial(0.01, 16, 200);
+end
+
+for i=1:129
+    noise_est_mic_parameters(i)=initial(0.1, 100, 200);
+end
 
 hh=waitbar(0, 'data is being processed');
 pcm_size=size(x_enframe,1);
@@ -164,7 +173,7 @@ for i=1:size(x_enframe,1)
     else
         peak_hold_frame=peak_hold_frame+1;
         if peak_hold_frame > 100
-            ref_peak=(1-smooth_factor1)*ref_peak + smooth_factor1*max(abs(ref_t));
+            ref_peak=(1-0.0952)*ref_peak + 0.0952*max(abs(ref_t));
         end
     end
     
@@ -177,7 +186,8 @@ for i=1:size(x_enframe,1)
         detect_far_end_buffer(6)=magnitude_tmp;
     end
     
-    A=1; % A????????????s???????, ?????etect_far_end_buffer(1)??????
+    aec_noise_estimation(detect_far_end_buffer(1), spk_t_ns_parameters);
+    A=spk_t_ns_parameters.noise_level(1);
     if detect_far_end_buffer(1) > max(10, 2*A)
         far_end_talk_flag = 1;
         far_end_hold_time = 20;
@@ -203,8 +213,7 @@ for i=1:size(x_enframe,1)
         else
             energy_group_peak(j) = 0.9048 * energy_group_peak(j) + (1-0.9048) * energy_group(j);
         end
-        
-        C=1; % energy_group(j) ???????????????????ef???´ï????????????????ns???????
+        aec_noise_estimation(energy_group(j), energy_group_parameters(j));
     end
     
     stack_ref_low(:, 2:20)=stack_ref_low(:, 1:19);
@@ -215,8 +224,9 @@ for i=1:size(x_enframe,1)
     if no_ref_count < 500
         input_f(1:4)=input_f(1:4).*AEC_HPF_COEFF;
         mic_peak=max(abs(input_t));
+        % naming not reasonable
         if far_end_hold_time < 20
-            ref_cnt=20; % naming not reasonable
+            ref_cnt=20; 
         else
             ref_cnt=max(0, ref_cnt-1); % there is a far end lasting for 20 frames, would make a zero
         end
@@ -234,7 +244,7 @@ for i=1:size(x_enframe,1)
         for k=1:32
             est_fir_early=stack_ref_low(k,1:4) * fir_coeff_low(k,1:4)';
             est_adf_early=stack_ref_low(k,1:4) * adf_coeff_low(k,1:4)';
-            est_fir=stack_ref_low(k,:) * fir_coeff_low(k,:)'; % Matrix Mul, waring of not a scalar
+            est_fir=stack_ref_low(k,:) * fir_coeff_low(k,:)'; % Matrix Mul, warning of not a scalar
             est_adf=stack_ref_low(k,:) * adf_coeff_low(k,:)';
             est_fir_e = abs(est_fir).^2;
             est_adf_e = abs(est_adf).^2;
@@ -242,8 +252,8 @@ for i=1:size(x_enframe,1)
             err_adf=input_f(k)-est_adf;
             input_power=sum(abs(stack_ref_low(k,:)).^2); % sum of buffer of length of 20
             norm_step=0.5/(input_power+0.01);
-            err_fir_e=abs(err_fir).^2;
-            err_adf_e=abs(err_adf).^2;
+            err_fir_e=abs(err_fir)^2;
+            err_adf_e=abs(err_adf)^2;
             mse_fir(k)=0.9735*mse_fir(k)+(1-0.9735)*err_fir_e;
             mse_adf(k)=0.9735*mse_adf(k)+(1-0.9735)*err_adf_e;
             mse_mic(k)=0.9735*mse_mic(k)+(1-0.9735)*(abs(input_f(k)).^2);
@@ -286,7 +296,7 @@ for i=1:size(x_enframe,1)
                 tmp = 20;
             end
             
-            B=1; % B????????????s???????????????????ic?????????????????????????????????????????
+            B=noise_est_mic_parameters(k).noise_level(1);
             if input_power * erl_ratio(subband_index) > tmp * B && filter_freeze == 0 % tmp is for dt state threshold
                 adf_coeff_low(k,:) = adf_coeff_low(k,:) + norm_step * err_adf' * stack_ref_low(k,:);
                 fir_update_flag(k)=1;
@@ -334,7 +344,7 @@ for i=1:size(x_enframe,1)
         for k=33:128
             est_fir_early=stack_ref_hi(k-32,1:4) * fir_coeff_hi(k-32,1:4)';
             est_adf_early=stack_ref_hi(k-32,1:4) * adf_coeff_hi(k-32,1:4)';
-            est_fir=stack_ref_hi(k-32,:) * fir_coeff_hi(k-32,:)'; % Matrix Mul, waring of not a scalar
+            est_fir=stack_ref_hi(k-32,:) * fir_coeff_hi(k-32,:)'; % Matrix Mul, warning of not a scalar
             est_adf=stack_ref_hi(k-32,:) * adf_coeff_hi(k-32,:)';
             est_fir_e = abs(est_fir).^2;
             est_adf_e = abs(est_adf).^2;
@@ -342,8 +352,8 @@ for i=1:size(x_enframe,1)
             err_adf=input_f(k)-est_adf;
             input_power=sum(abs(stack_ref_hi(k-32,:)).^2);
             norm_step=0.5/(input_power+0.01);
-            err_fir_e=abs(err_fir).^2;
-            err_adf_e=abs(err_adf).^2;
+            err_fir_e=abs(err_fir)^2;
+            err_adf_e=abs(err_adf)^2;
             mse_fir(k)=0.9735*mse_fir(k)+(1-0.9735)*err_fir_e;
             mse_adf(k)=0.9735*mse_adf(k)+(1-0.9735)*err_adf_e;
             mse_mic(k)=0.9735*mse_mic(k)+(1-0.9735)*(abs(input_f(k)).^2);
@@ -384,7 +394,7 @@ for i=1:size(x_enframe,1)
                 tmp = 20;
             end
             
-            B=1; % B????????????s???????????????????ic?????????????????????????????????????????
+            B=noise_est_mic_parameters(k).noise_level(1);
             if input_power * erl_ratio(subband_index) > tmp * B && filter_freeze == 0
                 adf_coeff_hi(k-32,:) = adf_coeff_hi(k-32,:) + norm_step * err_adf' * stack_ref_hi(k-32,:);
                 fir_update_flag(k)=1;
@@ -449,6 +459,7 @@ for i=1:size(x_enframe,1)
                 erl_peak(j)=erl_peak(j)*0.9048+echo_return_energy(j)*(1-0.9048);
             end
             
+            C = energy_group_parameters(j).noise_level(2);
             if energy_group(j) > 10 * C && input_mic_energy(j) > 4 * est_mic_energy(j) && filter_freeze == 0 && far_end_hold_time == 20
                 erl_val = erl_peak(j) / (energy_group_peak(j) + 10^-6);
                 erl_val = min(32, erl_val);
@@ -482,8 +493,6 @@ for i=1:size(x_enframe,1)
         corr_near_res=conj(input_f) .* fir_out;
         corr_near_res_smooth=0.7165*corr_near_res_smooth + (1-0.7165)*corr_near_res;
         coh_temp_1=(abs(corr_near_res_smooth).^2) ./ (res_psd_smooth .* near_psd_smooth + 10^-10);
-        % res_psd_temp=sum(res_psd(3:126));
-        % near_psd_temp=sum(near_psd(3:126));
         corr_near_ref=conj(input_f) .* input_r;
         corr_near_ref_smooth=0.7165*corr_near_ref_smooth + (1-0.7165)*corr_near_ref;
         coh_temp_2=(abs(corr_near_ref_smooth).^2) ./ (near_psd_smooth .* ref_psd_smooth + 10^-10);
@@ -496,7 +505,8 @@ for i=1:size(x_enframe,1)
         end
         
         if coh_near_res_avg > 0.8 && coh_near_ref_avg < 0.3
-            near_state = 1; % ?????????state????????????????????????????????????????lp????????????            near_state_hold = 0;
+            near_state = 1;           
+            near_state_hold = 0;
         elseif coh_near_res_avg < 0.75 || coh_near_ref_avg > 0.5
             if near_state_hold == 3
                 near_state = 0;
@@ -516,9 +526,7 @@ for i=1:size(x_enframe,1)
                 nl_coeff=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
-                % ??ear_res
             else
-                % ??- near_far
                 nl_coeff=1- coh_temp_2;
                 nl_coeff_fb=1- coh_near_ref_avg;
                 nl_coeff_fb_low= 1- coh_near_ref_avg;
@@ -528,9 +536,7 @@ for i=1:size(x_enframe,1)
                 nl_coeff=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
-                % ??near_res
             else
-                % ??min(near_res, 1 - near_far)
                 nl_coeff=min(coh_temp_1, 1-coh_temp_2);
                 nl_coeff_temp_array=sort(nl_coeff(5:32));
                 nl_coeff_fb = nl_coeff_temp_array(21);
@@ -577,8 +583,8 @@ for i=1:size(x_enframe,1)
         else
             over_drive_smooth = 0.9 * over_drive_smooth + 0.1 * over_drive;
         end
-        
-        nl_coeff = abs(nl_coeff); 
+  
+%         nl_coeff = abs(nl_coeff); 
         for k=3:126
             if nl_coeff(k) > nl_coeff_fb
                nl_coeff(k) = (1 -WEB_RTC_AEC_NL_WEIGHT_CURVE(k)) * nl_coeff(k) + WEB_RTC_AEC_NL_WEIGHT_CURVE(k) * nl_coeff_fb;
