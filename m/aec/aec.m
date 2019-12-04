@@ -1,5 +1,5 @@
-function total_input_f=aec(mic_name, mic_name_2, ref_name)
-[x_enframe, x2_enframe, r_enframe, x_f, x2_f, r_f]=hpf(mic_name, mic_name_2, ref_name);
+function total_input_f_pcm=aec(mic_name, mic_name_2, ref_name, filter_coeff)
+[x_enframe, x2_enframe, r_enframe, x_f, x2_f, r_f]=hpf(mic_name, mic_name_2, ref_name, filter_coeff);
 ref_peak=0;
 smooth_factor1=1-exp(-1/10);
 peak_hold_frame=0;
@@ -143,6 +143,7 @@ E=1;
 
 hh=waitbar(0, 'data is being processed');
 pcm_size=size(x_enframe,1);
+total_input_f_pcm=zeros(pcm_size, 258);
 for i=1:size(x_enframe,1)
     str=[num2str(i), ' / ', num2str(pcm_size), ' processed']; 
     waitbar(i/pcm_size, hh, str); 
@@ -919,6 +920,7 @@ for i=1:size(x_enframe,1)
     if no_ref_count > 20
         dt_flag = 1;
     end
+    total_input_f_pcm(i, :) = total_input_f;
 end
 close(hh);
 end
