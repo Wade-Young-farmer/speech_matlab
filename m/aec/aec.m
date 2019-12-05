@@ -137,10 +137,6 @@ mse_fir2=zeros(1, 129);
 mse_adf2=zeros(1, 129);
 mse_mic2=zeros(1, 129);
 
-D=1;
-E=1;
-C=1;
-
 spk_t_ns_parameters = initial(16, 100, 200);
 for i=1:4
     energy_group_parameters(i)=initial(0.01, 16, 200);
@@ -149,6 +145,9 @@ end
 for i=1:129
     noise_est_mic_parameters(i)=initial(0.1, 100, 200);
 end
+doubletalk_1_parameters=initial(0.1, 100, 62);
+doubletalk_2_parameters=initial(0.01, 4, 200);
+post_parameters=initial(0.01, 1, 100);
 
 hh=waitbar(0, 'data is being processed');
 pcm_size=size(x_enframe,1);
@@ -605,7 +604,11 @@ for i=1:size(x_enframe,1)
             freq=(j-1+0.5)*200 + 600;
             dt_spk_psd=sum(ref_e(DOUBLETALK_BAND_TABLE(2*j-1):DOUBLETALK_BAND_TABLE(2*j)-1));
             dt_mic_psd=sum(fir_out_e(DOUBLETALK_BAND_TABLE(2*j-1):DOUBLETALK_BAND_TABLE(2*j)-1));
-            dt_ns_psd=sum(B);
+            dt_ns_psd=0;
+            for p=DOUBLETALK_BAND_TABLE(2*j-1):DOUBLETALK_BAND_TABLE(2*j)-1
+                B=noise_est_mic_parameters(p).noise_level(1);
+                dt_ns_psd = dt_ns_psd + B;
+            end
             
             if freq > 800
                 dt_mic_psd_sum = dt_mic_psd_sum + dt_mic_psd;
@@ -636,9 +639,10 @@ for i=1:size(x_enframe,1)
         end
         
         if far_end_hold_time == 20
-            D = 10; % track dt_mic_psd_sum
+            aec_noise_estimation(dt_mic_psd_sum, doubletalk_1_parameters);
         end
         
+        D=doubletalk_1_parameters.noise_level(1);
         mic_snr = dt_mic_psd_sum / D;
         if dt_frame_count < 10
             mic_ratio_smooth = mic_spk_ratio;
@@ -651,8 +655,9 @@ for i=1:size(x_enframe,1)
         end
         
         if far_end_hold_time == 20
-            E = 1; % track mic_ratio_smooth
+            aec_noise_estimation(mic_ratio_smooth, doubletalk_2_parameters);
         end
+        E=doubletalk_2_parameters.noise_level(1);
         mic_ratio_level = mic_spk_ratio / E;
         if dt_frame_count < 10
             dt_frame_count = dt_frame_count +1;
@@ -690,7 +695,7 @@ for i=1:size(x_enframe,1)
         
         if dt_flag == 0
             for k = 3:125
-                F = 1; % track power_ori_mic
+                aec_noise_estimation(power_ori_mic(k), noise_est_mic_parameters(k));
             end
         end
     else
@@ -785,7 +790,8 @@ for i=1:size(x_enframe,1)
         end
         
         if coh_near_res_avg > 0.8 && coh_near_ref_avg < 0.3
-            near_state2 = 1; % ?????????state????????????????????????????????????????lp????????????            near_state_hold2 = 0;
+            near_state2 = 1; % ?????????state????????????????????????????????????????lp????????????            
+            near_state_hold2 = 0;
         elseif coh_near_res_avg < 0.75 || coh_near_ref_avg > 0.5
             if near_state_hold2 == 3
                 near_state2 = 0;
@@ -867,7 +873,7 @@ for i=1:size(x_enframe,1)
             over_drive_smooth2 = 0.9 * over_drive_smooth2 + 0.1 * over_drive2;
         end
         
-        nl_coeff = abs(nl_coeff); 
+%         nl_coeff = abs(nl_coeff); 
         for k=3:126
             if nl_coeff(k) > nl_coeff_fb
                nl_coeff(k) = (1 -WEB_RTC_AEC_NL_WEIGHT_CURVE(k)) * nl_coeff(k) + WEB_RTC_AEC_NL_WEIGHT_CURVE(k) * nl_coeff_fb;
@@ -885,7 +891,8 @@ for i=1:size(x_enframe,1)
         % post_process
         % nlp_overdrive, total_input_f, nl_coeff, dt_flag, dt_st_strict, 2
         nl_coeff_mean=mean(nl_coeff(5:24));
-        G=0.2; % track nl_coeff_mean, level one minumum
+        aec_noise_estimation(nl_coeff_mean, post_parameters);
+        G=post_parameters.noise_level(1);
         nlp_snr = nl_coeff_mean/(G + 10^-10);
         if dt_flag ~= 0 && nlp_snr > 3
             dt_hold_age = 40;
