@@ -193,7 +193,7 @@ filter_coeff=[-0.000030328878, -0.000030577072, -0.000031071936, -0.000031810440
         -0.000037089977, -0.000035435750, -0.000033998941, -0.000032788081, ...
         -0.000031810440, -0.000031071936, -0.000030577072, -0.000030328878];
 
-total_input_f_pcm=aec('rec_mic_0_0_short.pcm', 'rec_mic_1_0_short.pcm', 'rec_spk_l_0_short.pcm', filter_coeff);
+total_input_f_pcm=aec('input_data/rec_mic_0_0_short.pcm', 'input_data/rec_mic_1_0_short.pcm', 'input_data/rec_spk_l_0_short.pcm', filter_coeff);
 tmp1 = total_input_f_pcm(:,1:129);
 tmp2 = total_input_f_pcm(:,130:258);
 [out1, out2] = compose(tmp1, tmp2, filter_coeff);
