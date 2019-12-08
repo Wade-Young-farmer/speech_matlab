@@ -1,3 +1,6 @@
+close all;
+clc;
+clear all;
 filter_coeff=[-0.000030328878, -0.000030577072, -0.000031071936, -0.000031810440, ...
         -0.000032788081, -0.000033998941, -0.000035435750, -0.000037089977, ...
         -0.000038951924, -0.000041010841, -0.000043255049, -0.000045672075, ...
@@ -995,5 +998,22 @@ hold on;
 plot(out);
 hold on;
 plot(dut, '.');
+% This is time inpulse response
+
+% This is freq repsonse 
+[h,w]=freqz(out, 1, 256);
+
+r1 = rectwin(768);
+[h1,w0] = freqz(r1,1,256);
+
+r2 = hamming(768);
+[h2, w2]=freqz(r2,1, 256);
+
+figure;
+plot(w/pi, 20*log10(abs(h/max(h))));
+hold on;
+plot(w0/pi,20*log10(abs(h1/max(h1))), '*');
+hold on;
+plot(w2/pi,20*log10(abs(h2/max(h2))));
 
 

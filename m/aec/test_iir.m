@@ -13,9 +13,11 @@ sos1=[g(1) * b,a];
 sos2=[g(2) * d,c];
 sos=[sos1;sos2];
 [b3, a3]=sos2tf(sos);
-[h3,w3]=freqz(b3, a3, 128);
-[h2,w2]=freqz(sos,128);
-[h1,w1]=freqz(b0, a0, 128);
+
+W=linspace(-pi, pi, 256);
+[h3,w3]=freqz(b3, a3, W);
+[h2,w2]=freqz(sos,W);
+[h1,w1]=freqz(b0, a0, W);
 % h2
 plot(w1/pi,20*log10(abs(h1)));
 hold on;
