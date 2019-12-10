@@ -148,8 +148,6 @@ end
 doubletalk_1_parameters=initial(0.1, 100, 62);
 doubletalk_2_parameters=initial(0.01, 4, 200);
 post_parameters=initial(0.01, 1, 100);
-D=1;
-E=1;
 
 hh=waitbar(0, 'data is being processed');
 pcm_size=size(x_enframe,1);
@@ -187,7 +185,8 @@ for i=1:size(x_enframe,1)
         detect_far_end_buffer(6)=magnitude_tmp;
     end
     
-    A=1; % A????????????s???????, ?????etect_far_end_buffer(1)??????
+    aec_noise_estimation(detect_far_end_buffer(1), spk_t_ns_parameters);
+    A=spk_t_ns_parameters.noise_level(1);
     if detect_far_end_buffer(1) > max(10, 2*A)
         far_end_talk_flag = 1;
         far_end_hold_time = 20;
@@ -213,8 +212,7 @@ for i=1:size(x_enframe,1)
         else
             energy_group_peak(j) = 0.9048 * energy_group_peak(j) + (1-0.9048) * energy_group(j);
         end
-        
-        C=1; % energy_group(j) ???????????????????ef???´ï????????????????ns???????
+        aec_noise_estimation(energy_group(j), energy_group_parameters(j));
     end
     
     stack_ref_low(:, 2:20)=stack_ref_low(:, 1:19);
@@ -297,7 +295,7 @@ for i=1:size(x_enframe,1)
                 tmp = 20;
             end
             
-            B=1; % B????????????s???????????????????ic?????????????????????????????????????????
+            B=noise_est_mic_parameters(k).noise_level(1);
             if input_power * erl_ratio(subband_index) > tmp * B && filter_freeze == 0 % tmp is for dt state threshold
                 adf_coeff_low(k,:) = adf_coeff_low(k,:) + norm_step * err_adf' * stack_ref_low(k,:);
                 fir_update_flag(k)=1;
@@ -395,7 +393,7 @@ for i=1:size(x_enframe,1)
                 tmp = 20;
             end
             
-            B=1; % B????????????s???????????????????ic?????????????????????????????????????????
+            B=noise_est_mic_parameters(k).noise_level(1);
             if input_power * erl_ratio(subband_index) > tmp * B && filter_freeze == 0
                 adf_coeff_hi(k-32,:) = adf_coeff_hi(k-32,:) + norm_step * err_adf' * stack_ref_hi(k-32,:);
                 fir_update_flag(k)=1;
@@ -460,6 +458,7 @@ for i=1:size(x_enframe,1)
                 erl_peak(j)=erl_peak(j)*0.9048+echo_return_energy(j)*(1-0.9048);
             end
             
+            C = energy_group_parameters(j).noise_level(2);
             if energy_group(j) > 10 * C && input_mic_energy(j) > 4 * est_mic_energy(j) && filter_freeze == 0 && far_end_hold_time == 20
                 erl_val = erl_peak(j) / (energy_group_peak(j) + 10^-6);
                 erl_val = min(32, erl_val);
@@ -605,7 +604,11 @@ for i=1:size(x_enframe,1)
             freq=(j-1+0.5)*200 + 600;
             dt_spk_psd=sum(ref_e(DOUBLETALK_BAND_TABLE(2*j-1):DOUBLETALK_BAND_TABLE(2*j)-1));
             dt_mic_psd=sum(fir_out_e(DOUBLETALK_BAND_TABLE(2*j-1):DOUBLETALK_BAND_TABLE(2*j)-1));
-            dt_ns_psd=sum(B);
+            dt_ns_psd=0;
+            for p=DOUBLETALK_BAND_TABLE(2*j-1):DOUBLETALK_BAND_TABLE(2*j)-1
+                B=noise_est_mic_parameters(p).noise_level(1);
+                dt_ns_psd = dt_ns_psd + B;
+            end
             
             if freq > 800
                 dt_mic_psd_sum = dt_mic_psd_sum + dt_mic_psd;
@@ -636,9 +639,10 @@ for i=1:size(x_enframe,1)
         end
         
         if far_end_hold_time == 20
-            D = 10; % track dt_mic_psd_sum
+            aec_noise_estimation(dt_mic_psd_sum, doubletalk_1_parameters);
         end
         
+        D=doubletalk_1_parameters.noise_level(1);
         mic_snr = dt_mic_psd_sum / D;
         if dt_frame_count < 10
             mic_ratio_smooth = mic_spk_ratio;
@@ -651,8 +655,9 @@ for i=1:size(x_enframe,1)
         end
         
         if far_end_hold_time == 20
-            E = 1; % track mic_ratio_smooth
+            aec_noise_estimation(mic_ratio_smooth, doubletalk_2_parameters);
         end
+        E=doubletalk_2_parameters.noise_level(1);
         mic_ratio_level = mic_spk_ratio / E;
         if dt_frame_count < 10
             dt_frame_count = dt_frame_count +1;
@@ -690,7 +695,7 @@ for i=1:size(x_enframe,1)
         
         if dt_flag == 0
             for k = 3:125
-                F = 1; % track power_ori_mic
+                aec_noise_estimation(power_ori_mic(k), noise_est_mic_parameters(k));
             end
         end
     else
@@ -886,7 +891,8 @@ for i=1:size(x_enframe,1)
         % post_process
         % nlp_overdrive, total_input_f, nl_coeff, dt_flag, dt_st_strict, 2
         nl_coeff_mean=mean(nl_coeff(5:24));
-        G=0.2; % track nl_coeff_mean, level one minumum
+        aec_noise_estimation(nl_coeff_mean, post_parameters);
+        G=0.1;
         nlp_snr = nl_coeff_mean/(G + 10^-10);
         if dt_flag ~= 0 && nlp_snr > 3
             dt_hold_age = 40;
