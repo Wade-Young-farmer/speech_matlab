@@ -121,5 +121,11 @@ switch delay
 end
 
 h = idct(hc, win_size);
+figure(2);
+plot(hc_low);
+hold on;
+plot(hc_medium);
+hold on;
+plot(hc_high);
 
 end

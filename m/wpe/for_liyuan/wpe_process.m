@@ -41,6 +41,7 @@ Y(:, :, 1:max(max_delay)-1) = X(:, :, 1:max(max_delay)-1);
 
 H = zeros(mic_num * max(h_size), 2, frame_num);
 % H = zeros((mic_num-1) * max(h_size), 2, frame_num);
+HH = zeros(mic_num * max(h_size), frame_num);
 
 FBF_ONLY_FOR_REF_FLAG = 0;
 % RLS style
@@ -173,7 +174,7 @@ for ss = 1:subband_num
             end       
         else
         %     matrix = eps * eye(mic_num * h_size, mic_num * h_size);
-            matrix = 1 * eye(mic_num * H_SIZE, mic_num * H_SIZE);
+            matrix = 10000 * eye(mic_num * H_SIZE, mic_num * H_SIZE);
             h = zeros(mic_num * H_SIZE, mic_num);
 
         %     data_buf = zeros(mic_num, 6);
@@ -202,9 +203,9 @@ for ss = 1:subband_num
                 k = matrix * X_SF_delta/(gamma * lamda + X_SF_delta' * matrix * X_SF_delta);
                 matrix = (1/gamma) * (matrix - k * X_SF_delta' * matrix);
 
-                X_pred = X_SF - h' * X_SF_delta;
-                h = h + k * X_pred';
-                X_pred = X_SF - h' * X_SF_delta;
+                X_pred = X_SF - (X_SF_delta' * h).';
+                h = h + k * X_pred.';
+                X_pred = X_SF - (X_SF_delta' * h).';
 
                 if (sum(abs(X_pred)) > sum(abs(X_SF)))
                     X_pred = X_SF;
@@ -212,10 +213,10 @@ for ss = 1:subband_num
 
                 Y(:, ss, ff) = X_pred;
 
-%                 % 滤波器收敛分析
-%                 if (ss == 10)
-%                     H(:, :, ff) = h(:,1:2);
-%                 end
+                % 滤波器收敛分析
+                if (ss == 10)
+                    HH(:, ff) = h(:,1);
+                end
 
         %         %更新权重系数
         %         if (sum(abs(X_pred)) > sum(abs(X_SF)))
@@ -236,5 +237,10 @@ for ss = 1:subband_num
     end
 end
 
-% save H_low10_high10_6mic.mat H
+figure(3);clf
+for i=7:7:mic_num*max(h_size)
+    plot(abs(HH(i,1:3000)));
+    hold on;
+end
+% save H_low10_high10_6mic.mat HH
 end
