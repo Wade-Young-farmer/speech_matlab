@@ -7,7 +7,7 @@ ref_peak=0;
 peak_hold_frame=0;
 
 detect_far_end_buffer=zeros(1, 6);
-far_end_talk_flag=0;
+% far_end_talk_flag=0;
 far_end_hold_time=1;
 no_ref_count=0;
 
@@ -112,6 +112,7 @@ total_input_f_pcm=zeros(pcm_size, 258);
 for i=1:size(x_enframe,1)
     str=[num2str(i), ' / ', num2str(pcm_size), ' processed']; 
     waitbar(i/pcm_size, hh, str); 
+    
     input_t=x_enframe(i,:);
     input_t2=x2_enframe(i,:);
     input_f=x_f(i,:);
@@ -142,22 +143,24 @@ for i=1:size(x_enframe,1)
         detect_far_end_buffer(6)=magnitude_tmp;
     end
     
-    aec_noise_estimation(detect_far_end_buffer(1), spk_t_ns_parameters);
+    [spk_t_ns_parameters, vad_A] = aec_noise_estimation(detect_far_end_buffer(1), spk_t_ns_parameters);
     A=spk_t_ns_parameters.noise_level(1);
+    % [detect_far_end_buffer(1), spk_t_ns_parameters.noise_level]
     if detect_far_end_buffer(1) > max(10, 2*A)
-        far_end_talk_flag = 1;
+%         far_end_talk_flag = 1;
         far_end_hold_time = 20;
+%         i
     else
-        far_end_talk_flag = 0;
-        far_end_hold_time = min(0, far_end_hold_time - 1);
+%         far_end_talk_flag = 0;
+        far_end_hold_time = max(0, far_end_hold_time - 1);
     end
-    
+%     far_end_hold_time
     if far_end_hold_time == 0 && ref_peak < 20
-        no_ref_count=max(1000, no_ref_count+1);
+        no_ref_count=min(1000, no_ref_count+1);
     else
         no_ref_count=0;
     end
-        
+%     no_ref_count
     ref_e = abs(ref_f).^2;
     for j=1:4
         energy_group(j)=0;
@@ -169,8 +172,9 @@ for i=1:size(x_enframe,1)
         else
             energy_group_peak(j) = 0.9048 * energy_group_peak(j) + (1-0.9048) * energy_group(j);
         end
-        aec_noise_estimation(energy_group(j), energy_group_parameters(j));
+        [energy_group_parameters(j), vad_B] = aec_noise_estimation(energy_group(j), energy_group_parameters(j));
     end
+    energy_group
     
     stack_ref_low(:, 2:20)=stack_ref_low(:, 1:19);
     stack_ref_low(:, 1)=ref_f(1:32).';
@@ -596,7 +600,7 @@ for i=1:size(x_enframe,1)
         end
         
         if far_end_hold_time == 20
-            aec_noise_estimation(dt_mic_psd_sum, doubletalk_1_parameters);
+            [doubletalk_1_parameters, vad_C] = aec_noise_estimation(dt_mic_psd_sum, doubletalk_1_parameters);
         end
         
         D=doubletalk_1_parameters.noise_level(1);
@@ -612,7 +616,7 @@ for i=1:size(x_enframe,1)
         end
         
         if far_end_hold_time == 20
-            aec_noise_estimation(mic_ratio_smooth, doubletalk_2_parameters);
+            [doubletalk_2_parameters, vad_D] = aec_noise_estimation(mic_ratio_smooth, doubletalk_2_parameters);
         end
         E=doubletalk_2_parameters.noise_level(1);
         mic_ratio_level = mic_spk_ratio / E;
@@ -652,7 +656,7 @@ for i=1:size(x_enframe,1)
         
         if dt_flag == 0
             for k = 3:125
-                aec_noise_estimation(power_ori_mic(k), noise_est_mic_parameters(k));
+                [noise_est_mic_parameters(k), vad_E] = aec_noise_estimation(power_ori_mic(k), noise_est_mic_parameters(k));
             end
         end
     else
@@ -848,8 +852,8 @@ for i=1:size(x_enframe,1)
         % post_process
         % nlp_overdrive, total_input_f, nl_coeff, dt_flag, dt_st_strict, 2
         nl_coeff_mean=mean(nl_coeff(5:24));
-        aec_noise_estimation(nl_coeff_mean, post_parameters);
-        G=0.1;
+        [post_parameters, vad_F] = aec_noise_estimation(nl_coeff_mean, post_parameters);
+        G=post_parameters.noise_level(1);
         nlp_snr = nl_coeff_mean/(G + 10^-10);
         if dt_flag ~= 0 && nlp_snr > 3
             dt_hold_age = 40;
@@ -891,6 +895,10 @@ for i=1:size(x_enframe,1)
         dt_flag = 1;
     end
     total_input_f_pcm(i, :) = total_input_f;
+        
+    if i == 10
+       pause;
+    end
 end
 close(hh);
 end
