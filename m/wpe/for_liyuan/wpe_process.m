@@ -200,7 +200,7 @@ for ss = 1:subband_num
         %         end
 
                 lamda = (1/mic_num) * sum(abs(X_SF).^2);
-                k = matrix * X_SF_delta/(gamma * lamda + X_SF_delta' * matrix * X_SF_delta);
+                k = matrix * X_SF_delta/(gamma + X_SF_delta' * matrix * X_SF_delta);
                 matrix = (1/gamma) * (matrix - k * X_SF_delta' * matrix);
 
                 X_pred = X_SF - (X_SF_delta' * h).';
