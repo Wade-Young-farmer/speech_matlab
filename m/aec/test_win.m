@@ -4,6 +4,7 @@ clear all;
 % 这不是sin函数求幅频响应的方式
 t=0:0.01:4.99;
 x=cos(2*pi*t);
+figure;
 plot(t, x);
 X=fft(x);
 Y=fft(x(1:50));
@@ -33,9 +34,10 @@ File:Matlab的窗函数,矩形窗
 %==========================================================================
 %求矩形窗的频率响应图  
 %==========================================================================
-W = linspace(-pi,pi,4096);
+W = linspace(pi/4096,pi,4096);
 wn0 = rectwin(768);   %矩形窗函数 
 wn1 = hamming(768);
+wn2 = hanning(768);
 filter_coeff=[-0.000030328878, -0.000030577072, -0.000031071936, -0.000031810440, ...
         -0.000032788081, -0.000033998941, -0.000035435750, -0.000037089977, ...
         -0.000038951924, -0.000041010841, -0.000043255049, -0.000045672075, ...
@@ -228,34 +230,37 @@ filter_coeff=[-0.000030328878, -0.000030577072, -0.000031071936, -0.000031810440
         -0.000045672075, -0.000043255049, -0.000041010841, -0.000038951924, ...
         -0.000037089977, -0.000035435750, -0.000033998941, -0.000032788081, ...
         -0.000031810440, -0.000031071936, -0.000030577072, -0.000030328878];
-wn2=filter_coeff;
-wn3=hanning(768);
+wn3=filter_coeff;
 %20*log10(abs(WN))  
-[h1,w0] = freqz(wn0,1,W); 
-[h2,w1]=freqz(wn1,1, W);
-[h3,w3]=freqz(wn2,1, W);
-[h4,w4]=freqz(wn3,1, W);
+[h0,w0] = freqz(wn0,1,W); 
+[h1,w1]=freqz(wn1,1, W);
+[h2,w2]=freqz(wn2,1, W);
+[h3,w3]=freqz(wn3,1, W);
+
 
 %subplotfigure(5,1,1);  
 figure;
-% plot(w0/pi,20*log10(abs(h1/max(h1)))); 
-% hold on;
-plot(w0/pi, 20*log10(abs(h2/max(h2))));
+plot(w0/pi,20*log10(abs(h1/max(h1)))); 
 hold on;
-plot(w0/pi, 20*log10(abs(h3/max(h3))), 'g');
+plot(w0/pi, 20*log10(abs(h0/max(h2))));
 hold on;
-plot(w0/pi, 20*log10(abs(h4/max(h4))));
+plot(w0/pi, 20*log10(abs(h2/max(h2))), 'g');
+hold on;
+plot(w0/pi, 20*log10(abs(h3/max(h3))));
 
-
-axis([-0.1 0.1 -200 0]); 
+axis([0 0.1 -200 0]); 
 xlabel('归一化频率 /\pi');  
 ylabel('20log_{10}|W(e^{j\omega})| /dB');  
 title('矩形窗的傅里叶变换'); 
 set(gca,'YTick',[-100 -80 -60 -40 -20 0]*2)  
-set(gca,'XTick',[-0.1 :0.01:0.1])   
+set(gca,'XTick',[0:0.01:0.1])   
 %set(gca,'XAxisLocation','top');%设置X轴在上方  
 set(gca,'XAxisLocation','bottom');%设置X轴在下方  
 set(gca,'YAxisLocation','left'); %设置Y轴在左方  
 text(1,-124,'\pi');%gtext('\pi');
 % figure;
 % plot(w0/pi, phase(h1));
+
+WN3=fft(wn3);
+figure;
+plot(20*log10(abs(WN3)/max(abs(WN3))));
