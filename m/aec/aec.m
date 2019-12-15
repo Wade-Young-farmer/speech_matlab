@@ -1,7 +1,7 @@
 function total_input_f_pcm=aec(mic_name, mic_name_2, ref_name, filter_coeff, WEB_RTC_AEC_NL_WEIGHT_CURVE, DOUBLETALK_BAND_TABLE, BAND_TABLE)
+[r_enframe, r_f]=hpf(ref_name, filter_coeff);
 [x_enframe, x_f]=hpf(mic_name, filter_coeff);
 [x2_enframe, x2_f]=hpf(mic_name_2, filter_coeff);
-[r_enframe, r_f]=hpf(ref_name, filter_coeff);
 
 ref_peak=0;
 peak_hold_frame=0;
@@ -174,7 +174,7 @@ for i=1:size(x_enframe,1)
         end
         [energy_group_parameters(j), vad_B] = aec_noise_estimation(energy_group(j), energy_group_parameters(j));
     end
-    energy_group
+%     energy_group
     
     stack_ref_low(:, 2:20)=stack_ref_low(:, 1:19);
     stack_ref_low(:, 1)=ref_f(1:32).';
@@ -896,9 +896,9 @@ for i=1:size(x_enframe,1)
     end
     total_input_f_pcm(i, :) = total_input_f;
         
-    if i == 10
-       pause;
-    end
+%     if i == 10
+%        pause;
+%     end
 end
 close(hh);
 end

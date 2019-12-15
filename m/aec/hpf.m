@@ -4,9 +4,6 @@ x=fread(file_id, inf, 'int16');
 fclose(file_id);
 
 addpath('../basic');
-x_enframe = enframe(x,128);
-frame_size=size(x_enframe, 1);
-x_f=zeros(frame_size, 129);
 
 b=[1, -2, 1];
 a=[1, -1.95998, 0.9615];
@@ -15,13 +12,15 @@ c=[1, -0.96148];
 g = [0.0013094, 367.1433];
 b0 = g(1) * g(2) * conv(b, d);
 a0 = conv(a, c);
-
 buf_1 = zeros(1, 768);
 
+x = filter(b0, a0, x);
+x_enframe = enframe(x,128);
+frame_size=size(x_enframe, 1);
+x_f=zeros(frame_size, 129);
+% pause
 for i=1:frame_size
     input = x_enframe(i,:);
-    input = filter(b0, a0, input);
-    x_enframe(i,:)=input;
     
     buf_1(641:768)=input;
     temp = filter_coeff .* buf_1;
