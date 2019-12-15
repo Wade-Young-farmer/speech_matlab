@@ -38,6 +38,7 @@ fir_out2=zeros(1, 129);
 power_ori_mic=zeros(1, 129);
 fir_est_ref=zeros(1, 129);
 power_echo=zeros(1,129);
+% used in fir part, strang meaning
 ref_cnt=0;
 
 erl_peak=zeros(1,4);
@@ -109,12 +110,15 @@ post_parameters=initial(0.01, 1, 100);
 hh=waitbar(0, 'data is being processed');
 pcm_size=size(x_enframe,1);
 total_input_f_pcm=zeros(pcm_size, 258);
+fir_out_debug=zeros(pcm_size, 10);
+nl_coeff1_debug=zeros(pcm_size, 10);
+dt_flag_debug=zeros(pcm_size,2);
 for i=1:size(x_enframe,1)
     str=[num2str(i), ' / ', num2str(pcm_size), ' processed']; 
     waitbar(i/pcm_size, hh, str); 
     
     input_t=x_enframe(i,:);
-    input_t2=x2_enframe(i,:);
+%     input_t2=x2_enframe(i,:);
     input_f=x_f(i,:);
     input_f2=x2_f(i,:);
     input_f_bak=input_f;
@@ -143,7 +147,7 @@ for i=1:size(x_enframe,1)
         detect_far_end_buffer(6)=magnitude_tmp;
     end
     
-    [spk_t_ns_parameters, vad_A] = aec_noise_estimation(detect_far_end_buffer(1), spk_t_ns_parameters);
+    [spk_t_ns_parameters] = aec_noise_estimation(detect_far_end_buffer(1), spk_t_ns_parameters);
     A=spk_t_ns_parameters.noise_level(1);
     % [detect_far_end_buffer(1), spk_t_ns_parameters.noise_level]
     if detect_far_end_buffer(1) > max(10, 2*A)
@@ -163,16 +167,13 @@ for i=1:size(x_enframe,1)
 %     no_ref_count
     ref_e = abs(ref_f).^2;
     for j=1:4
-        energy_group(j)=0;
-        for k=BAND_TABLE(j):BAND_TABLE(j+1)
-            energy_group(j)=energy_group(j)+ref_e(k);
-        end
+        energy_group(j) = sum(ref_e(BAND_TABLE(2*j-1):BAND_TABLE(2*j)));
         if energy_group(j) > energy_group_peak(j)
             energy_group_peak(j) = energy_group(j);
         else
             energy_group_peak(j) = 0.9048 * energy_group_peak(j) + (1-0.9048) * energy_group(j);
         end
-        [energy_group_parameters(j), vad_B] = aec_noise_estimation(energy_group(j), energy_group_parameters(j));
+        [energy_group_parameters(j)] = aec_noise_estimation(energy_group(j), energy_group_parameters(j));
     end
 %     energy_group
     
@@ -181,6 +182,7 @@ for i=1:size(x_enframe,1)
     stack_ref_hi(:,2:16)=stack_ref_hi(:,1:15);
     stack_ref_hi(:,1)=ref_f(33:128).';
     
+%     no_ref_count
     if no_ref_count < 500
         input_f(1:4)=input_f(1:4).*AEC_HPF_COEFF;
         mic_peak=max(abs(input_t));
@@ -299,7 +301,7 @@ for i=1:size(x_enframe,1)
         for k = 1:2
             fir_out(k)=0;
         end
-        
+         
         % High channel copied from low
         for k=33:128
             est_fir_early=stack_ref_hi(k-32,1:4) * fir_coeff_hi(k-32,1:4)';
@@ -395,7 +397,8 @@ for i=1:size(x_enframe,1)
         for k=127:128
             fir_out(k)=0;
         end
-        
+        fir_out_debug(i,1:5)=fir_out(1:5);
+        fir_out_debug(i,6:10) = fir_out(125:129);
         total_input_f(1:129)=fir_out(1:129);
         stack_est_ref(:,2:6) = stack_est_ref(:, 1:5);
         stack_est_ref(:, 1) = fir_est_ref.';
@@ -404,16 +407,13 @@ for i=1:size(x_enframe,1)
         input_mic_energy=zeros(1,4);
         est_mic_energy=zeros(1,4);
         echo_return_energy=zeros(1,4);
+        input_f_e = abs(input_f).^2;
         for j=1:4
-            for k=BAND_TABLE(j):BAND_TABLE(j+1)
-                input_mic_energy(j)=input_mic_energy(j)+abs(input_f(k))^2;
-                est_mic_energy(j)=est_mic_energy(j)+power_ori_mic(k);
-                echo_return_energy(j)=echo_return_energy(j)+power_echo(k);
-            end
-        end
-        
-        for j=1:4
-            if erl_peak(j)<echo_return_energy(j)
+            input_mic_energy(j) = sum(input_f_e(BAND_TABLE(2*j-1):BAND_TABLE(2*j)));
+            est_mic_energy(j) = sum(power_ori_mic(BAND_TABLE(2*j-1):BAND_TABLE(2*j)));
+            echo_return_energy(j) = sum(power_echo(BAND_TABLE(2*j-1):BAND_TABLE(2*j)));
+            
+            if erl_peak(j) < echo_return_energy(j)
                 erl_peak(j)=echo_return_energy(j);
             else
                 erl_peak(j)=erl_peak(j)*0.9048+echo_return_energy(j)*(1-0.9048);
@@ -435,6 +435,8 @@ for i=1:size(x_enframe,1)
             erl_ratio(j)=max(erl_ratio(j), min_erl_ratio);
             erl_ratio(j)=min(erl_ratio(j), max_erl_ratio);
         end
+              
+%       erl_ratio
         
         % nlp
         % input_r, fir_out, input_f, ref_peak?????ar_end_hold_time, 1, 0
@@ -444,8 +446,9 @@ for i=1:size(x_enframe,1)
             volumn = 0;
         end
         
+%         volumn
         res_psd=abs(fir_out).^2;
-        near_psd=abs(input_f).^2;
+        near_psd=input_f_e;
         ref_psd=abs(input_r).^2;
         res_psd_smooth=0.7165*res_psd_smooth + (1-0.7165)*res_psd;
         near_psd_smooth=0.7165*near_psd_smooth + (1-0.7165)*near_psd;
@@ -506,7 +509,7 @@ for i=1:size(x_enframe,1)
         
         nlp_coeff_temp = min(nlp_coeff_temp+0.0003, 1);
         
-        % Min track nl_coeff_fb?????is not used in none wakeup judge case
+        % Min track nl_coeff_fb is not used in none wakeup judge case
         if nl_coeff_fb_low < min(0.6, nl_coeff_fb_local_min)
             nl_coeff_fb_min = nl_coeff_fb_low;
             nl_coeff_fb_local_min = nl_coeff_fb_low;
@@ -547,14 +550,19 @@ for i=1:size(x_enframe,1)
 %         nl_coeff = abs(nl_coeff); 
         for k=3:126
             if nl_coeff(k) > nl_coeff_fb
-               nl_coeff(k) = (1 -WEB_RTC_AEC_NL_WEIGHT_CURVE(k)) * nl_coeff(k) + WEB_RTC_AEC_NL_WEIGHT_CURVE(k) * nl_coeff_fb;
+               nl_coeff(k) = (1-WEB_RTC_AEC_NL_WEIGHT_CURVE(k)) * nl_coeff(k) + WEB_RTC_AEC_NL_WEIGHT_CURVE(k) * nl_coeff_fb;
             end
             
-            % judge difference is here!
+            % judge difference is here! If there is false wakeup judge,
+            % should multiply a different value
             fir_out(k) = fir_out(k) * nl_coeff(k);
         end
+        fir_out_debug(i,1:5)=fir_out(1:5);
+        fir_out_debug(i,6:10) = fir_out(125:129);
+        % nl_coeff1 is very much close to 1
         nl_coeff1 = nl_coeff;
-        
+        nl_coeff1_debug(i,1:5)=nl_coeff1(1:5);
+        nl_coeff1_debug(i,6:10)=nl_coeff1(125:129);
         fir_out_e = abs(fir_out).^2;
         
         % double_talk
@@ -600,7 +608,7 @@ for i=1:size(x_enframe,1)
         end
         
         if far_end_hold_time == 20
-            [doubletalk_1_parameters, vad_C] = aec_noise_estimation(dt_mic_psd_sum, doubletalk_1_parameters);
+            [doubletalk_1_parameters] = aec_noise_estimation(dt_mic_psd_sum, doubletalk_1_parameters);
         end
         
         D=doubletalk_1_parameters.noise_level(1);
@@ -616,7 +624,7 @@ for i=1:size(x_enframe,1)
         end
         
         if far_end_hold_time == 20
-            [doubletalk_2_parameters, vad_D] = aec_noise_estimation(mic_ratio_smooth, doubletalk_2_parameters);
+            [doubletalk_2_parameters] = aec_noise_estimation(mic_ratio_smooth, doubletalk_2_parameters);
         end
         E=doubletalk_2_parameters.noise_level(1);
         mic_ratio_level = mic_spk_ratio / E;
@@ -654,9 +662,10 @@ for i=1:size(x_enframe,1)
             end
         end
         
+        dt_flag_debug(i,:) = [dt_flag, dt_flag_strict];
         if dt_flag == 0
             for k = 3:125
-                [noise_est_mic_parameters(k), vad_E] = aec_noise_estimation(power_ori_mic(k), noise_est_mic_parameters(k));
+                [noise_est_mic_parameters(k)] = aec_noise_estimation(power_ori_mic(k), noise_est_mic_parameters(k));
             end
         end
     else
@@ -852,7 +861,7 @@ for i=1:size(x_enframe,1)
         % post_process
         % nlp_overdrive, total_input_f, nl_coeff, dt_flag, dt_st_strict, 2
         nl_coeff_mean=mean(nl_coeff(5:24));
-        [post_parameters, vad_F] = aec_noise_estimation(nl_coeff_mean, post_parameters);
+        [post_parameters] = aec_noise_estimation(nl_coeff_mean, post_parameters);
         G=post_parameters.noise_level(1);
         nlp_snr = nl_coeff_mean/(G + 10^-10);
         if dt_flag ~= 0 && nlp_snr > 3
@@ -896,9 +905,12 @@ for i=1:size(x_enframe,1)
     end
     total_input_f_pcm(i, :) = total_input_f;
         
-%     if i == 10
-%        pause;
-%     end
+    if i == 480
+       save fir_out_debug.mat fir_out_debug
+       save nl_coeff1_debug.mat nl_coeff1_debug
+       save dt_flag_debug.mat dt_flag_debug
+       pause;
+    end
 end
 close(hh);
 end

@@ -1,4 +1,4 @@
-function [paremeters, vad] = aec_noise_estimation(input, paremeters)
+function [paremeters] = aec_noise_estimation(input, paremeters)
 min_noise_energy = paremeters.min_noise_energy;
 max_noise_energy = paremeters.max_noise_energy;
 
