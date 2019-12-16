@@ -113,6 +113,7 @@ total_input_f_pcm=zeros(pcm_size, 258);
 fir_out_debug=zeros(pcm_size, 10);
 nl_coeff1_debug=zeros(pcm_size, 10);
 dt_flag_debug=zeros(pcm_size,2);
+total_input_1_f_debug=zeros(pcm_size, 10);
 for i=1:size(x_enframe,1)
     str=[num2str(i), ' / ', num2str(pcm_size), ' processed']; 
     waitbar(i/pcm_size, hh, str); 
@@ -276,31 +277,50 @@ for i=1:size(x_enframe,1)
                 min_power_early=abs(fir_early_tmp)^2;
                 early_out=fir_early_tmp;
             end
-            
+            if k == 4
+                [err_fir_e, err_adf_e, min_power_early]
+            end
             if err_fir_e > err_adf_e
                 power_ori_mic(k)=err_adf_e;
                 power_echo(k)=est_adf_e;
                 if err_adf_e > min_power_early
                     fir_out(k)=early_out;
-                    % fir_out(k)=early_out;
+%                     if k == 4
+%                         1
+%                     end
                 else
                     fir_out(k)=err_adf;
+%                     if k == 4
+%                         2
+%                     end
                 end 
             else
                 power_ori_mic(k)=err_fir_e;
                 power_echo(k)=est_fir_e;
                 if err_fir_e > min_power_early
                     fir_out(k)=early_out;
+%                     if k == 4
+%                         3
+%                     end
                 else
                     fir_out(k)=err_fir;
+%                     if k == 4
+%                         4
+%                     end
                 end
             end
-            fir_est_ref(k)=input_f(k)-fir_out(k);         
+            fir_est_ref(k)=input_f(k)-fir_out(k);
+            
+%             if k == 4
+%                 [early_out, err_adf, err_fir, fir_out(k)]                
+%             end
         end
         
         for k = 1:2
             fir_out(k)=0;
         end
+        
+       
          
         % High channel copied from low
         for k=33:128
@@ -628,10 +648,10 @@ for i=1:size(x_enframe,1)
         end
         E=doubletalk_2_parameters.noise_level(1);
         mic_ratio_level = mic_spk_ratio / E;
+        dt_flag = 0;
+        dt_flag_strict = 0;
         if dt_frame_count < 10
             dt_frame_count = dt_frame_count +1;
-            dt_flag = 0;
-            dt_flag_strict = 0;
         else
             if mic_ratio_level > 10 && mic_snr > 50
                 dt_count =40;
@@ -661,7 +681,8 @@ for i=1:size(x_enframe,1)
                 dt_flag_strict = 1;
             end
         end
-        
+%         dt_frame_count
+%         far_end_hold_time
         dt_flag_debug(i,:) = [dt_flag, dt_flag_strict];
         if dt_flag == 0
             for k = 3:125
@@ -671,6 +692,9 @@ for i=1:size(x_enframe,1)
     else
         total_input_f(1:129) = input_f_bak;
     end
+    
+    total_input_1_f_debug(i, 1:5) = total_input_f(1:5);
+    total_input_1_f_debug(i, 6:10) = total_input_f(125:129);
     
     % deal with 2nd mic, should not used if not for efficiency purpose    
     if no_ref_count < 500
@@ -905,10 +929,11 @@ for i=1:size(x_enframe,1)
     end
     total_input_f_pcm(i, :) = total_input_f;
         
-    if i == 480
+    if i == 481
        save fir_out_debug.mat fir_out_debug
        save nl_coeff1_debug.mat nl_coeff1_debug
        save dt_flag_debug.mat dt_flag_debug
+       save total_input_1_f_debug.mat total_input_1_f_debug
        pause;
     end
 end
