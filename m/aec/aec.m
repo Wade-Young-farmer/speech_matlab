@@ -114,6 +114,7 @@ fir_out_debug=zeros(pcm_size, 10);
 nl_coeff1_debug=zeros(pcm_size, 10);
 dt_flag_debug=zeros(pcm_size,2);
 total_input_1_f_debug=zeros(pcm_size, 10);
+dt_flag_1_debug=zeros(pcm_size,1);
 for i=1:size(x_enframe,1)
     str=[num2str(i), ' / ', num2str(pcm_size), ' processed']; 
     waitbar(i/pcm_size, hh, str); 
@@ -203,7 +204,7 @@ for i=1:size(x_enframe,1)
                 filter_freeze=0;
             end
         end
-        
+        dt_flag_1_debug(i)=dt_flag;
         for k=1:32
             est_fir_early=stack_ref_low(k,1:4) * fir_coeff_low(k,1:4)';
             est_adf_early=stack_ref_low(k,1:4) * adf_coeff_low(k,1:4)';
@@ -220,6 +221,9 @@ for i=1:size(x_enframe,1)
             mse_fir(k)=0.9735*mse_fir(k)+(1-0.9735)*err_fir_e;
             mse_adf(k)=0.9735*mse_adf(k)+(1-0.9735)*err_adf_e;
             mse_mic(k)=0.9735*mse_mic(k)+(1-0.9735)*(abs(input_f(k)).^2);
+%             if k == 4
+%                 [adf_coeff_low(k,:)]
+%             end
             
             if mse_adf(k) > mse_mic(k) * 8
                 adf_coeff_low(k,:)=0;
@@ -260,10 +264,19 @@ for i=1:size(x_enframe,1)
             end
             
             B=noise_est_mic_parameters(k).noise_level(1);
+%             if k == 4
+%                 [input_power, erl_ratio(1), tmp, B, filter_freeze]
+%             end
             if input_power * erl_ratio(subband_index) > tmp * B && filter_freeze == 0 % tmp is for dt state threshold
+%                 if k == 4
+%                     1
+%                 end
                 adf_coeff_low(k,:) = adf_coeff_low(k,:) + norm_step * err_adf' * stack_ref_low(k,:);
                 fir_update_flag(k)=1;
             else
+%                 if k == 4
+%                     0
+%                 end
                 fir_update_flag(k)=0;
             end
             
@@ -277,9 +290,9 @@ for i=1:size(x_enframe,1)
                 min_power_early=abs(fir_early_tmp)^2;
                 early_out=fir_early_tmp;
             end
-            if k == 4
-                [err_fir_e, err_adf_e, min_power_early]
-            end
+%             if k == 4
+%                 [err_fir_e, err_adf_e, min_power_early]
+%             end
             if err_fir_e > err_adf_e
                 power_ori_mic(k)=err_adf_e;
                 power_echo(k)=est_adf_e;
@@ -319,9 +332,7 @@ for i=1:size(x_enframe,1)
         for k = 1:2
             fir_out(k)=0;
         end
-        
-       
-         
+          
         % High channel copied from low
         for k=33:128
             est_fir_early=stack_ref_hi(k-32,1:4) * fir_coeff_hi(k-32,1:4)';
@@ -933,6 +944,7 @@ for i=1:size(x_enframe,1)
        save fir_out_debug.mat fir_out_debug
        save nl_coeff1_debug.mat nl_coeff1_debug
        save dt_flag_debug.mat dt_flag_debug
+       save dt_flag_1_debug.mat dt_flag_1_debug
        save total_input_1_f_debug.mat total_input_1_f_debug
        pause;
     end
