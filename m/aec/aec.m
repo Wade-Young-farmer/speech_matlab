@@ -112,9 +112,14 @@ pcm_size=size(x_enframe,1);
 total_input_f_pcm=zeros(pcm_size, 258);
 fir_out_debug=zeros(pcm_size, 10);
 nl_coeff1_debug=zeros(pcm_size, 10);
+nl_coeff2_debug=zeros(pcm_size, 10);
 dt_flag_debug=zeros(pcm_size,2);
 total_input_1_f_debug=zeros(pcm_size, 10);
 dt_flag_1_debug=zeros(pcm_size,1);
+dt_flag_before_post=zeros(pcm_size, 1);
+dt_flag_after_post=zeros(pcm_size, 1);
+post_debug=zeros(pcm_size, 2);
+nlp_snr_debug=zeros(pcm_size, 2);
 for i=1:size(x_enframe,1)
     str=[num2str(i), ' / ', num2str(pcm_size), ' processed']; 
     waitbar(i/pcm_size, hh, str); 
@@ -781,8 +786,6 @@ for i=1:size(x_enframe,1)
         corr_near_res=conj(input_f2) .* fir_out2;
         corr_near_res_smooth2=0.7165*corr_near_res_smooth2 + (1-0.7165)*corr_near_res;
         coh_temp_1=(abs(corr_near_res_smooth2).^2) ./ (res_psd_smooth .* near_psd_smooth + 10^-10);
-        % res_psd_temp=sum(res_psd(3:126));
-        % near_psd_temp=sum(near_psd(3:126));
         corr_near_ref=conj(input_f) .* input_r;
         corr_near_ref_smooth2=0.7165*corr_near_ref_smooth2 + (1-0.7165)*corr_near_ref;
         coh_temp_2=(abs(corr_near_ref_smooth2).^2) ./ (near_psd_smooth .* ref_psd_smooth + 10^-10);
@@ -795,7 +798,7 @@ for i=1:size(x_enframe,1)
         end
         
         if coh_near_res_avg > 0.8 && coh_near_ref_avg < 0.3
-            near_state2 = 1; % ?????????state????????????????????????????????????????lp????????????            
+            near_state2 = 1;             
             near_state_hold2 = 0;
         elseif coh_near_res_avg < 0.75 || coh_near_ref_avg > 0.5
             if near_state_hold2 == 3
@@ -813,26 +816,22 @@ for i=1:size(x_enframe,1)
         if nlp_coeff_temp2 == 1 % represents no far end
             over_drive2=1;
             if near_state2 == 1
-                nl_coeff=coh_temp_1;
+                nl_coeff22=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
-                % ??ear_res
             else
-                % ??- near_far
-                nl_coeff=1- coh_temp_2;
+                nl_coeff22=1- coh_temp_2;
                 nl_coeff_fb=1- coh_near_ref_avg;
                 nl_coeff_fb_low= 1- coh_near_ref_avg;
             end
         else
             if volumn == 0 && near_state2 == 1
-                nl_coeff=coh_temp_1;
+                nl_coeff22=coh_temp_1;
                 nl_coeff_fb = coh_near_res_avg;
                 nl_coeff_fb_low = coh_near_res_avg;
-                % ??near_res
             else
-                % ??min(near_res, 1 - near_far)
-                nl_coeff=min(coh_temp_1, 1-coh_temp_2);
-                nl_coeff_temp_array=sort(nl_coeff(5:32));
+                nl_coeff22=min(coh_temp_1, 1-coh_temp_2);
+                nl_coeff_temp_array=sort(nl_coeff22(5:32));
                 nl_coeff_fb = nl_coeff_temp_array(21);
                 nl_coeff_fb_low = nl_coeff_temp_array(14);
             end
@@ -840,7 +839,6 @@ for i=1:size(x_enframe,1)
         
         nlp_coeff_temp2 = min(nlp_coeff_temp2+0.0003, 1);
         
-        % Min track nl_coeff_fb?????is not used in none wakeup judge case
         if nl_coeff_fb_low < min(0.6, nl_coeff_fb_local_min2)
             nl_coeff_fb_min2 = nl_coeff_fb_low;
             nl_coeff_fb_local_min2 = nl_coeff_fb_low;
@@ -880,25 +878,29 @@ for i=1:size(x_enframe,1)
         
 %         nl_coeff = abs(nl_coeff); 
         for k=3:126
-            if nl_coeff(k) > nl_coeff_fb
-               nl_coeff(k) = (1 -WEB_RTC_AEC_NL_WEIGHT_CURVE(k)) * nl_coeff(k) + WEB_RTC_AEC_NL_WEIGHT_CURVE(k) * nl_coeff_fb;
+            if nl_coeff22(k) > nl_coeff_fb
+               nl_coeff22(k) = (1 -WEB_RTC_AEC_NL_WEIGHT_CURVE(k)) * nl_coeff22(k) + WEB_RTC_AEC_NL_WEIGHT_CURVE(k) * nl_coeff_fb;
             end
         end
-        nl_coeff2 = nl_coeff;
+        nl_coeff2 = nl_coeff22;
     else
         total_input_f(130:258)=input_f2_bak;
     end
-    
+    nl_coeff2_debug(i,1:5) = nl_coeff2(1:5);
+    nl_coeff2_debug(i,6:10) = nl_coeff2(125:129);
+
+    dt_flag_before_post(i) = dt_flag;
     if no_ref_count < 500
-        nl_coeff=mean([nl_coeff1;nl_coeff2]);
+        nl_coeff_=mean([nl_coeff1;nl_coeff1]);
         nlp_overdrive = mean([over_drive, over_drive2]);
         
         % post_process
         % nlp_overdrive, total_input_f, nl_coeff, dt_flag, dt_st_strict, 2
-        nl_coeff_mean=mean(nl_coeff(5:24));
+        nl_coeff_mean=mean(nl_coeff_(5:24));
         [post_parameters] = aec_noise_estimation(nl_coeff_mean, post_parameters);
         G=post_parameters.noise_level(1);
         nlp_snr = nl_coeff_mean/(G + 10^-10);
+        nlp_snr_debug(i, :) = [nl_coeff_mean, G];
         if dt_flag ~= 0 && nlp_snr > 3
             dt_hold_age = 40;
         else
@@ -938,16 +940,24 @@ for i=1:size(x_enframe,1)
     if no_ref_count > 20
         dt_flag = 1;
     end
+    post_debug(i,:)=[dt_hold_age, no_ref_count];
     total_input_f_pcm(i, :) = total_input_f;
+    
+    dt_flag_after_post(i) = dt_flag;
         
-    if i == 481
-       save fir_out_debug.mat fir_out_debug
-       save nl_coeff1_debug.mat nl_coeff1_debug
-       save dt_flag_debug.mat dt_flag_debug
-       save dt_flag_1_debug.mat dt_flag_1_debug
-       save total_input_1_f_debug.mat total_input_1_f_debug
-       pause;
-    end
+%     if i == 481
+%        save fir_out_debug.mat fir_out_debug
+%        save nl_coeff1_debug.mat nl_coeff1_debug
+%        save nl_coeff2_debug.mat nl_coeff2_debug
+%        save dt_flag_debug.mat dt_flag_debug
+%        save dt_flag_1_debug.mat dt_flag_1_debug
+%        save total_input_1_f_debug.mat total_input_1_f_debug
+%        save dt_flag_before_post.mat dt_flag_before_post
+%        save dt_flag_after_post.mat dt_flag_after_post
+%        save post_debug.mat post_debug
+%        save nlp_snr_debug.mat nlp_snr_debug
+%        pause;
+%     end
 end
 close(hh);
 end
