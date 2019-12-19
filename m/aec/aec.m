@@ -675,12 +675,14 @@ for i=1:size(x_enframe,1)
                 dt_count = max(0, dt_count-1);
             end
             
-            if dt_count > 0
-                dt_flag = 2;
-            end
-            
             if far_end_hold_time == 0
                 dt_flag = 1;
+            else
+                if dt_count > 0
+                    dt_flag = 2;
+                else
+                    dt_flag = 0;
+                end
             end
             
             if mic_ratio_level > 50 && mic_snr > 100
@@ -689,12 +691,14 @@ for i=1:size(x_enframe,1)
                 dt_count_strict = max(0, dt_count_strict -1);
             end
             
-            if dt_count_strict > 0
-                dt_flag_strict = 2;
-            end
-            
             if far_end_hold_time == 0
                 dt_flag_strict = 1;
+            else
+                if dt_count_strict > 0
+                    dt_flag_strict = 2;
+                else
+                    dt_flag_strict = 0;
+                end
             end
         end
 %         dt_frame_count
