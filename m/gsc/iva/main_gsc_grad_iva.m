@@ -1,6 +1,7 @@
 clc
 clear
 close all
+addpath('./filter_bank');
 fs = 16000;
 frame_len = 8;
 frame_size = fs * frame_len / 1000;
@@ -9,9 +10,9 @@ subband_num = frame_size * over_sample_ratio / 2 + 1;
 delay = 3;
 h_size = frame_size * over_sample_ratio * 3;
 h = filter_bank_win(h_size, delay);
-filepath='W:\Project\DATA\online_data\xdyx1s_2k\split_audio_new\16000_6718720045453489871\';
-waveName1 = 'rec_mic_1_0.pcm';
-waveName2 = 'rec_mic_2_0.pcm';
+filepath='../../aec/input_data/';
+waveName1 = 'rec_mic_0_0_short.pcm';
+waveName2 = 'rec_mic_1_0_short.pcm';
 fid = fopen([filepath waveName1],'rb');
 pathInfo = dir([filepath waveName1]);
 L = pathInfo.bytes/2;
