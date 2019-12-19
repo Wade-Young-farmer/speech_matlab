@@ -1,4 +1,4 @@
-function parameters=initial(min_val, max_val, win_len)
+function parameters=noise_initial(min_val, max_val, win_len)
 min_noise_energy = min_val;
 max_noise_energy = max_val;
 

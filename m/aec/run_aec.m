@@ -81,13 +81,14 @@ toc;
 disp(['运行时间: ',num2str(toc)]);
 tmp1 = total_input_f_pcm(:,1:129);
 tmp2 = total_input_f_pcm(:,130:258);
-[out1, out2] = compose(tmp1, tmp2, filter_coeff);
+[out1] = compose(tmp1, filter_coeff);
+[out2] = compose(tmp2, filter_coeff);
 x = size(out1, 1);
 y = size(out1, 2);
 out1 = reshape(out1.', [x*y, 1]);
 out2 = reshape(out2.', [x*y, 1]);
 
-file_id=fopen('out_aec_0_0_debug.pcm','wb');
+file_id=fopen('out_aec_0_0_debug_.pcm','wb');
 fwrite(file_id, out1,'int16');
 fclose(file_id);
 

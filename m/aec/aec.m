@@ -40,43 +40,10 @@ fir_est_ref=zeros(1, 129);
 power_echo=zeros(1,129);
 % used in fir part, strang meaning
 ref_cnt=0;
-
 erl_peak=zeros(1,4);
-res_psd_smooth=zeros(1,129);
-near_psd_smooth=zeros(1,129);
-ref_psd_smooth=zeros(1,129);
-corr_near_res_smooth=zeros(1,129);
-corr_near_ref_smooth=zeros(1,129);
-nlp_coeff_temp=1.0;
-near_state_hold=0;
-near_state=0;
-over_drive=2;
-over_drive_smooth=2;
 
-nl_coeff_fb_min=0;
-nl_coeff_fb_local_min=1;
-nlp_is_new_min=0;
-nlp_new_min_ctrl=0;
-nlp_min_hold_time=0;
-min_coeff_tmp=1;
-
-res_psd_smooth2=zeros(1,129);
-near_psd_smooth2=zeros(1,129);
-ref_psd_smooth2=zeros(1,129);
-corr_near_res_smooth2=zeros(1,129);
-corr_near_ref_smooth2=zeros(1,129);
-nlp_coeff_temp2=1.0;
-near_state_hold2=0;
-near_state2=0;
-over_drive2=2;
-over_drive_smooth2=2;
-
-nl_coeff_fb_min2=0;
-nl_coeff_fb_local_min2=1;
-nlp_is_new_min2=0;
-nlp_new_min_ctrl2=0;
-nlp_min_hold_time2=0;
-min_coeff_tmp2=1;
+nlp_parameters = nlp_initial();
+nlp_parameters2 = nlp_initial();
 
 dt_spk_peak=zeros(1, 37);
 dt_frame_count = 0;
@@ -95,17 +62,17 @@ mse_fir2=zeros(1, 129);
 mse_adf2=zeros(1, 129);
 mse_mic2=zeros(1, 129);
 
-spk_t_ns_parameters = initial(16, 100, 200);
+spk_t_ns_parameters = noise_initial(16, 100, 200);
 for i=1:4
-    energy_group_parameters(i)=initial(0.01, 16, 200);
+    energy_group_parameters(i)=noise_initial(0.01, 16, 200);
 end
 
 for i=1:129
-    noise_est_mic_parameters(i)=initial(0.1, 100, 200);
+    noise_est_mic_parameters(i)=noise_initial(0.1, 100, 200);
 end
-doubletalk_1_parameters=initial(0.1, 100, 62);
-doubletalk_2_parameters=initial(0.01, 4, 200);
-post_parameters=initial(0.01, 1, 100);
+doubletalk_1_parameters=noise_initial(0.1, 100, 62);
+doubletalk_2_parameters=noise_initial(0.01, 4, 200);
+post_parameters=noise_initial(0.01, 1, 100);
 
 hh=waitbar(0, 'data is being processed');
 pcm_size=size(x_enframe,1);
@@ -471,132 +438,11 @@ for i=1:size(x_enframe,1)
             erl_ratio(j)=max(erl_ratio(j), min_erl_ratio);
             erl_ratio(j)=min(erl_ratio(j), max_erl_ratio);
         end
-              
-%       erl_ratio
         
-        % nlp
-        % input_r, fir_out, input_f, ref_peak?????ar_end_hold_time, 1, 0
-        if ref_peak > 5000
-            volumn = 1;
-        else
-            volumn = 0;
-        end
-        
-%         volumn
-        res_psd=abs(fir_out).^2;
-        near_psd=input_f_e;
-        ref_psd=abs(input_r).^2;
-        res_psd_smooth=0.7165*res_psd_smooth + (1-0.7165)*res_psd;
-        near_psd_smooth=0.7165*near_psd_smooth + (1-0.7165)*near_psd;
-        ref_psd_smooth=0.7165*ref_psd_smooth + (1-0.7165)*max(16,ref_psd);
-        corr_near_res=conj(input_f) .* fir_out;
-        corr_near_res_smooth=0.7165*corr_near_res_smooth + (1-0.7165)*corr_near_res;
-        coh_temp_1=(abs(corr_near_res_smooth).^2) ./ (res_psd_smooth .* near_psd_smooth + 10^-10);
-        corr_near_ref=conj(input_f) .* input_r;
-        corr_near_ref_smooth=0.7165*corr_near_ref_smooth + (1-0.7165)*corr_near_ref;
-        coh_temp_2=(abs(corr_near_ref_smooth).^2) ./ (near_psd_smooth .* ref_psd_smooth + 10^-10);
-        
-        coh_near_ref_avg=mean(coh_temp_2(5:32));
-        coh_near_res_avg=mean(coh_temp_1(5:32)); % near is input here
-        
-        if 1 - coh_near_ref_avg < min(0.75, nlp_coeff_temp)
-            nlp_coeff_temp = 1 - coh_near_ref_avg;
-        end
-        
-        if coh_near_res_avg > 0.8 && coh_near_ref_avg < 0.3
-            near_state = 1;           
-            near_state_hold = 0;
-        elseif coh_near_res_avg < 0.75 || coh_near_ref_avg > 0.5
-            if near_state_hold == 3
-                near_state = 0;
-            else
-                near_state_hold = near_state_hold + 1;
-            end
-        end
-        
-        if far_end_hold_time == 0
-            near_state = 1; % represents someone is talking or speaker is not talking
-            near_state_hold = 0;
-        end
-        
-        if nlp_coeff_temp == 1 % represents no far end
-            over_drive=1;
-            if near_state == 1
-                nl_coeff=coh_temp_1;
-                nl_coeff_fb = coh_near_res_avg;
-                nl_coeff_fb_low = coh_near_res_avg;
-            else
-                nl_coeff=1- coh_temp_2;
-                nl_coeff_fb=1- coh_near_ref_avg;
-                nl_coeff_fb_low= 1- coh_near_ref_avg;
-            end
-        else
-            if volumn == 0 && near_state == 1
-                nl_coeff=coh_temp_1;
-                nl_coeff_fb = coh_near_res_avg;
-                nl_coeff_fb_low = coh_near_res_avg;
-            else
-                nl_coeff=min(coh_temp_1, 1-coh_temp_2);
-                nl_coeff_temp_array=sort(nl_coeff(5:32));
-                nl_coeff_fb = nl_coeff_temp_array(21);
-                nl_coeff_fb_low = nl_coeff_temp_array(14);
-            end
-        end
-        
-        nlp_coeff_temp = min(nlp_coeff_temp+0.0003, 1);
-        
-        % Min track nl_coeff_fb is not used in none wakeup judge case
-        if nl_coeff_fb_low < min(0.6, nl_coeff_fb_local_min)
-            nl_coeff_fb_min = nl_coeff_fb_low;
-            nl_coeff_fb_local_min = nl_coeff_fb_low;
-            nlp_is_new_min=1;
-            nlp_new_min_ctrl=0;
-            nlp_min_hold_time=0;
-        else
-            nlp_min_hold_time=nlp_min_hold_time+1;
-        end
-        
-        if nlp_min_hold_time > 100 && nl_coeff_fb_low < min_coeff_tmp
-            min_coeff_tmp = nl_coeff_fb_low;
-        end
-           
-        if nlp_min_hold_time > 300 
-            nl_coeff_fb_local_min = min_coeff_tmp;
-            nl_coeff_fb_min = min_coeff_tmp;
-            min_coeff_tmp = 1;
-            nlp_min_hold_time = 150;
-        end
-        
-        nl_coeff_fb_local_min = min(nl_coeff_fb_local_min + 0.0004, 1);
-        if nlp_is_new_min == 1
-            nlp_new_min_ctrl = nlp_new_min_ctrl + 1;
-        end
-        if nlp_new_min_ctrl == 2
-            nlp_is_new_min = 0;
-            nlp_new_min_ctrl = 0;
-            over_drive = max(-1.15 / (log(nl_coeff_fb_min + 10^-10) + 10^-10), 1);
-        end
-        
-        if over_drive < over_drive_smooth
-            over_drive_smooth = 0.99 * over_drive_smooth + 0.01 * over_drive;
-        else
-            over_drive_smooth = 0.9 * over_drive_smooth + 0.1 * over_drive;
-        end
-  
-%         nl_coeff = abs(nl_coeff); 
-        for k=3:126
-            if nl_coeff(k) > nl_coeff_fb
-               nl_coeff(k) = (1-WEB_RTC_AEC_NL_WEIGHT_CURVE(k)) * nl_coeff(k) + WEB_RTC_AEC_NL_WEIGHT_CURVE(k) * nl_coeff_fb;
-            end
-            
-            % judge difference is here! If there is false wakeup judge,
-            % should multiply a different value
-            fir_out(k) = fir_out(k) * nl_coeff(k);
-        end
+        % nl_coeff1 is very much close to 1
+        [nlp_parameters, nl_coeff1, fir_out] = nlp(nlp_parameters, ref_peak, fir_out, input_f_e, input_f, input_r, far_end_hold_time, WEB_RTC_AEC_NL_WEIGHT_CURVE);
         fir_out_debug(i,1:5)=fir_out(1:5);
         fir_out_debug(i,6:10) = fir_out(125:129);
-        % nl_coeff1 is very much close to 1
-        nl_coeff1 = nl_coeff;
         nl_coeff1_debug(i,1:5)=nl_coeff1(1:5);
         nl_coeff1_debug(i,6:10)=nl_coeff1(125:129);
         fir_out_e = abs(fir_out).^2;
@@ -725,8 +571,6 @@ for i=1:size(x_enframe,1)
         for k =1:129
             est_ref_fir = stack_est_ref(k,:) * fir_coeff_2(k, :)';
             est_ref_adf = stack_est_ref(k,:) * adf_coeff_2(k, :)';
-%             est_ref_fir_e = abs(est_ref_fir).^2;
-%             est_ref_adf_e = abs(est_ref_adf).^2;
             err_fir = input_f2(k) - est_ref_fir;
             err_adf = input_f2(k) - est_ref_adf;
             mu = 0.5 / (sum(abs(stack_est_ref(k, :).^2) + 0.01));
@@ -773,120 +617,8 @@ for i=1:size(x_enframe,1)
         fir_out2 = fir_out2 .* max(1, abs(total_input_f(1:129)) .* abs(input_f2_bak) / (abs(fir_out2) .* abs(input_f_bak) + 10^-10));    
         total_input_f(130:258) = fir_out2;
         
-        % nlp
-        % use input_f2_bak instead of input_f2, should be the same
-        % input_r, fir_out2, input_f2_bak, ref_peak?????ar_end_hold_time, 0, 0
-        if ref_peak > 5000
-            volumn = 1;
-        else
-            volumn = 0;
-        end        
-        res_psd=abs(fir_out2).^2;
-        near_psd=abs(input_f2).^2;
-        ref_psd=abs(input_r).^2;
-        res_psd_smooth2=0.7165*res_psd_smooth2 + (1-0.7165)*res_psd;
-        near_psd_smooth2=0.7165*near_psd_smooth2 + (1-0.7165)*near_psd;
-        ref_psd_smooth2=0.7165*ref_psd_smooth2 + (1-0.7165)*max(16,ref_psd);
-        corr_near_res=conj(input_f2) .* fir_out2;
-        corr_near_res_smooth2=0.7165*corr_near_res_smooth2 + (1-0.7165)*corr_near_res;
-        coh_temp_1=(abs(corr_near_res_smooth2).^2) ./ (res_psd_smooth .* near_psd_smooth + 10^-10);
-        corr_near_ref=conj(input_f) .* input_r;
-        corr_near_ref_smooth2=0.7165*corr_near_ref_smooth2 + (1-0.7165)*corr_near_ref;
-        coh_temp_2=(abs(corr_near_ref_smooth2).^2) ./ (near_psd_smooth .* ref_psd_smooth + 10^-10);
-        
-        coh_near_ref_avg=mean(coh_temp_2(5:32));
-        coh_near_res_avg=mean(coh_temp_1(5:32)); % near is input here
-        
-        if 1 - coh_near_ref_avg < min(0.75, nlp_coeff_temp2)
-            nlp_coeff_temp2 = 1 - coh_near_ref_avg;
-        end
-        
-        if coh_near_res_avg > 0.8 && coh_near_ref_avg < 0.3
-            near_state2 = 1;             
-            near_state_hold2 = 0;
-        elseif coh_near_res_avg < 0.75 || coh_near_ref_avg > 0.5
-            if near_state_hold2 == 3
-                near_state2 = 0;
-            else
-                near_state_hold2 = near_state_hold2 + 1;
-            end
-        end
-        
-        if far_end_hold_time == 0
-            near_state2 = 1; % represents someone is talking or speaker is not talking
-            near_state_hold2 = 0;
-        end
-        
-        if nlp_coeff_temp2 == 1 % represents no far end
-            over_drive2=1;
-            if near_state2 == 1
-                nl_coeff22=coh_temp_1;
-                nl_coeff_fb = coh_near_res_avg;
-                nl_coeff_fb_low = coh_near_res_avg;
-            else
-                nl_coeff22=1- coh_temp_2;
-                nl_coeff_fb=1- coh_near_ref_avg;
-                nl_coeff_fb_low= 1- coh_near_ref_avg;
-            end
-        else
-            if volumn == 0 && near_state2 == 1
-                nl_coeff22=coh_temp_1;
-                nl_coeff_fb = coh_near_res_avg;
-                nl_coeff_fb_low = coh_near_res_avg;
-            else
-                nl_coeff22=min(coh_temp_1, 1-coh_temp_2);
-                nl_coeff_temp_array=sort(nl_coeff22(5:32));
-                nl_coeff_fb = nl_coeff_temp_array(21);
-                nl_coeff_fb_low = nl_coeff_temp_array(14);
-            end
-        end
-        
-        nlp_coeff_temp2 = min(nlp_coeff_temp2+0.0003, 1);
-        
-        if nl_coeff_fb_low < min(0.6, nl_coeff_fb_local_min2)
-            nl_coeff_fb_min2 = nl_coeff_fb_low;
-            nl_coeff_fb_local_min2 = nl_coeff_fb_low;
-            nlp_is_new_min2=1;
-            nlp_new_min_ctrl2=0;
-            nlp_min_hold_time2=0;
-        else
-            nlp_min_hold_time2=nlp_min_hold_time2+1;
-        end
-        
-        if nlp_min_hold_time2 > 100 && nl_coeff_fb_low < min_coeff_tmp2
-            min_coeff_tmp2 = nl_coeff_fb_low;
-        end
-           
-        if nlp_min_hold_time2 > 300 
-            nl_coeff_fb_local_min2 = min_coeff_tmp2;
-            nl_coeff_fb_min2 = min_coeff_tmp2;
-            min_coeff_tmp2 = 1;
-            nlp_min_hold_time2 = 150;
-        end
-        
-        nl_coeff_fb_local_min2 = min(nl_coeff_fb_local_min2 + 0.0004, 1);
-        if nlp_is_new_min2 == 1
-            nlp_new_min_ctrl2 = nlp_new_min_ctrl2 + 1;
-        end
-        if nlp_new_min_ctrl2 == 2
-            nlp_is_new_min2 = 0;
-            nlp_new_min_ctrl2 = 0;
-            over_drive2 = max(-1.15 / (log(nl_coeff_fb_min2 + 10^-10) + 10^-10), 1);
-        end
-        
-        if over_drive2 < over_drive_smooth2
-            over_drive_smooth2 = 0.99 * over_drive_smooth2 + 0.01 * over_drive2;
-        else
-            over_drive_smooth2 = 0.9 * over_drive_smooth2 + 0.1 * over_drive2;
-        end
-        
-%         nl_coeff = abs(nl_coeff); 
-        for k=3:126
-            if nl_coeff22(k) > nl_coeff_fb
-               nl_coeff22(k) = (1 -WEB_RTC_AEC_NL_WEIGHT_CURVE(k)) * nl_coeff22(k) + WEB_RTC_AEC_NL_WEIGHT_CURVE(k) * nl_coeff_fb;
-            end
-        end
-        nl_coeff2 = nl_coeff22;
+        input_f_e2 = abs(input_f2).^2;
+        [nlp_parameters2, nl_coeff2, ~] = nlp(nlp_parameters2, ref_peak, fir_out2, input_f_e2, input_f2, input_r, far_end_hold_time, WEB_RTC_AEC_NL_WEIGHT_CURVE); 
     else
         total_input_f(130:258)=input_f2_bak;
     end
@@ -895,12 +627,12 @@ for i=1:size(x_enframe,1)
 
     dt_flag_before_post(i) = dt_flag;
     if no_ref_count < 500
-        nl_coeff_=mean([nl_coeff1;nl_coeff1]);
-        nlp_overdrive = mean([over_drive, over_drive2]);
+        nl_coeff=mean([nl_coeff1;nl_coeff2]);
+        nlp_overdrive = mean([nlp_parameters.over_drive, nlp_parameters2.over_drive]);
         
         % post_process
         % nlp_overdrive, total_input_f, nl_coeff, dt_flag, dt_st_strict, 2
-        nl_coeff_mean=mean(nl_coeff_(5:24));
+        nl_coeff_mean=mean(nl_coeff(5:24));
         [post_parameters] = aec_noise_estimation(nl_coeff_mean, post_parameters);
         G=post_parameters.noise_level(1);
         nlp_snr = nl_coeff_mean/(G + 10^-10);
