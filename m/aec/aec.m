@@ -614,7 +614,7 @@ for i=1:size(x_enframe,1)
                 fir_out2(k) = input_f2(k);
             end      
         end
-        fir_out2 = fir_out2 .* max(1, abs(total_input_f(1:129)) .* abs(input_f2_bak) / (abs(fir_out2) .* abs(input_f_bak) + 10^-10));    
+        fir_out2 = fir_out2 .* min(1, abs(total_input_f(1:129)) .* abs(input_f2_bak) / (abs(fir_out2) .* abs(input_f_bak) + 10^-10));    
         total_input_f(130:258) = fir_out2;
         
         input_f_e2 = abs(input_f2).^2;

@@ -88,7 +88,7 @@ y = size(out1, 2);
 out1 = reshape(out1.', [x*y, 1]);
 out2 = reshape(out2.', [x*y, 1]);
 
-file_id=fopen('out_aec_0_0_debug_.pcm','wb');
+file_id=fopen('out_aec_0_0.pcm','wb');
 fwrite(file_id, out1,'int16');
 fclose(file_id);
 
