@@ -76,8 +76,10 @@ post_parameters=noise_initial(0.01, 1, 100);
 
 hh=waitbar(0, 'data is being processed');
 pcm_size=size(x_enframe,1);
+
 total_input_f_pcm=zeros(pcm_size, 258);
 fir_out_debug=zeros(pcm_size, 10);
+fir_out_2_debug=zeros(pcm_size, 10);
 nl_coeff1_debug=zeros(pcm_size, 10);
 nl_coeff2_debug=zeros(pcm_size, 10);
 dt_flag_debug=zeros(pcm_size,2);
@@ -92,11 +94,9 @@ for i=1:size(x_enframe,1)
     waitbar(i/pcm_size, hh, str); 
     
     input_t=x_enframe(i,:);
-%     input_t2=x2_enframe(i,:);
     input_f=x_f(i,:);
-    input_f2=x2_f(i,:);
     input_f_bak=input_f;
-    input_f2_bak=input_f2;
+
     ref_f=r_f(i,:);
     input_r=ref_f;
     
@@ -562,7 +562,9 @@ for i=1:size(x_enframe,1)
     total_input_1_f_debug(i, 1:5) = total_input_f(1:5);
     total_input_1_f_debug(i, 6:10) = total_input_f(125:129);
     
-    % deal with 2nd mic, should not used if not for efficiency purpose    
+    % deal with 2nd mic, should not used if not for efficiency purpose
+    input_f2=x2_f(i,:);
+    input_f2_bak=input_f2;
     if no_ref_count < 500
         input_f2(1:4)=input_f2(1:4).*AEC_HPF_COEFF;
         %retf process
@@ -614,6 +616,8 @@ for i=1:size(x_enframe,1)
                 fir_out2(k) = input_f2(k);
             end      
         end
+        fir_out_2_debug(i, 1:5) = fir_out2(1:5);
+        fir_out_2_debug(i, 6:10) = fir_out2(125:129);
         fir_out2 = fir_out2 .* min(1, abs(total_input_f(1:129)) .* abs(input_f2_bak) / (abs(fir_out2) .* abs(input_f_bak) + 10^-10));    
         total_input_f(130:258) = fir_out2;
         
@@ -631,7 +635,7 @@ for i=1:size(x_enframe,1)
         nlp_overdrive = mean([nlp_parameters.over_drive, nlp_parameters2.over_drive]);
         
         % post_process
-        % nlp_overdrive, total_input_f, nl_coeff, dt_flag, dt_st_strict, 2
+        % nlp_overdrive, total_input_f, nl_coeff, dt_flag, dt_st_strict
         nl_coeff_mean=mean(nl_coeff(5:24));
         [post_parameters] = aec_noise_estimation(nl_coeff_mean, post_parameters);
         G=post_parameters.noise_level(1);
@@ -659,18 +663,15 @@ for i=1:size(x_enframe,1)
         else
             over_drive_tmp = min(10, post_over_drive_sm);
         end
+
+        tmp_ = nl_coeff .^ over_drive_tmp;
+        if dt_flag == 2
+           tmp_ = max(tmp_, 0.1);
+        elseif dt_flag == 0
+           tmp_ = max(tmp_, 0.01);
+        end 
         
-        for k = 1:129
-            tmp_ = nl_coeff(k).^over_drive_tmp;
-            if dt_flag == 2
-                tmp_ = max(tmp_, 0.1);
-            elseif dt_flag == 0
-                tmp_ = max(tmp_, 0.01);
-            end
-            
-            total_input_f(k) = total_input_f(k) * tmp_;
-            total_input_f(k+129) = total_input_f(k+129) * tmp_;
-        end  
+        total_input_f = total_input_f .* [tmp_, tmp_];  
     end
     
     if no_ref_count > 20
@@ -681,19 +682,20 @@ for i=1:size(x_enframe,1)
     
     dt_flag_after_post(i) = dt_flag;
         
-%     if i == 481
-%        save fir_out_debug.mat fir_out_debug
-%        save nl_coeff1_debug.mat nl_coeff1_debug
-%        save nl_coeff2_debug.mat nl_coeff2_debug
-%        save dt_flag_debug.mat dt_flag_debug
-%        save dt_flag_1_debug.mat dt_flag_1_debug
-%        save total_input_1_f_debug.mat total_input_1_f_debug
-%        save dt_flag_before_post.mat dt_flag_before_post
-%        save dt_flag_after_post.mat dt_flag_after_post
-%        save post_debug.mat post_debug
-%        save nlp_snr_debug.mat nlp_snr_debug
-%        pause;
-%     end
+    if i == 485
+       save fir_out_debug.mat fir_out_debug
+       save nl_coeff1_debug.mat nl_coeff1_debug
+       save nl_coeff2_debug.mat nl_coeff2_debug
+       save dt_flag_debug.mat dt_flag_debug
+       save dt_flag_1_debug.mat dt_flag_1_debug
+       save total_input_1_f_debug.mat total_input_1_f_debug
+       save dt_flag_before_post.mat dt_flag_before_post
+       save dt_flag_after_post.mat dt_flag_after_post
+       save post_debug.mat post_debug
+       save nlp_snr_debug.mat nlp_snr_debug
+       save fir_out_2_debug.mat fir_out_2_debug
+       pause;
+    end
 end
 close(hh);
 end

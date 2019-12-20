@@ -97,6 +97,7 @@ plot(out1);
 grid on;
 subplot(2,1,2);
 specgram(out1, 2048, 16000, 2048, 1024);
+colorbar;
 % % Plot the STFT result
 % set(gcf, 'Position', [20 100 600 500]);
 % axes('Position', [0.1 0.1 0.85 0.5]);
