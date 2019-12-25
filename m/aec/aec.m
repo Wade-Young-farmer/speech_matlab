@@ -80,6 +80,7 @@ pcm_size=size(x_enframe,1);
 total_input_f_pcm=zeros(pcm_size, 258);
 fir_out_debug=zeros(pcm_size, 10);
 fir_out_2_debug=zeros(pcm_size, 10);
+ori_2_debug=zeros(pcm_size, 10);
 nl_coeff1_debug=zeros(pcm_size, 10);
 nl_coeff2_debug=zeros(pcm_size, 10);
 dt_flag_debug=zeros(pcm_size,2);
@@ -565,6 +566,8 @@ for i=1:size(x_enframe,1)
     % deal with 2nd mic, should not used if not for efficiency purpose
     input_f2=x2_f(i,:);
     input_f2_bak=input_f2;
+    ori_2_debug(i,1:5)=input_f2(1:5);
+    ori_2_debug(i,6:10)=input_f2(125:129);
     if no_ref_count < 500
         input_f2(1:4)=input_f2(1:4).*AEC_HPF_COEFF;
         %retf process
@@ -694,6 +697,7 @@ for i=1:size(x_enframe,1)
        save post_debug.mat post_debug
        save nlp_snr_debug.mat nlp_snr_debug
        save fir_out_2_debug.mat fir_out_2_debug
+       save ori_2_debug.mat ori_2_debug
        pause;
     end
 end
