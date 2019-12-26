@@ -7,7 +7,6 @@ ref_peak=0;
 peak_hold_frame=0;
 
 detect_far_end_buffer=zeros(1, 6);
-% far_end_talk_flag=0;
 far_end_hold_time=1;
 no_ref_count=0;
 
@@ -31,7 +30,6 @@ mse_mic=zeros(1, 129);
 
 erl_ratio=ones(1,4)*0.25;
 dt_flag=0;
-dt_flag_strict=0;
 fir_update_flag=zeros(1, 129);
 fir_out=zeros(1, 129);
 fir_out2=zeros(1, 129);
@@ -49,7 +47,6 @@ dt_spk_peak=zeros(1, 37);
 dt_frame_count = 0;
 mic_ratio_smooth = 0;
 dt_count=0;
-dt_count_strict=0;
 
 total_input_f=zeros(1, 258);
 stack_est_ref=zeros(129,6);
@@ -78,18 +75,6 @@ hh=waitbar(0, 'data is being processed');
 pcm_size=size(x_enframe,1);
 
 total_input_f_pcm=zeros(pcm_size, 258);
-fir_out_debug=zeros(pcm_size, 10);
-fir_out_2_debug=zeros(pcm_size, 10);
-ori_2_debug=zeros(pcm_size, 10);
-nl_coeff1_debug=zeros(pcm_size, 10);
-nl_coeff2_debug=zeros(pcm_size, 10);
-dt_flag_debug=zeros(pcm_size,2);
-total_input_1_f_debug=zeros(pcm_size, 10);
-dt_flag_1_debug=zeros(pcm_size,1);
-dt_flag_before_post=zeros(pcm_size, 1);
-dt_flag_after_post=zeros(pcm_size, 1);
-post_debug=zeros(pcm_size, 2);
-nlp_snr_debug=zeros(pcm_size, 2);
 for i=1:size(x_enframe,1)
     str=[num2str(i), ' / ', num2str(pcm_size), ' processed']; 
     waitbar(i/pcm_size, hh, str); 
@@ -124,22 +109,18 @@ for i=1:size(x_enframe,1)
     
     [spk_t_ns_parameters] = aec_noise_estimation(detect_far_end_buffer(1), spk_t_ns_parameters);
     A=spk_t_ns_parameters.noise_level(1);
-    % [detect_far_end_buffer(1), spk_t_ns_parameters.noise_level]
     if detect_far_end_buffer(1) > max(10, 2*A)
-%         far_end_talk_flag = 1;
         far_end_hold_time = 20;
-%         i
     else
-%         far_end_talk_flag = 0;
         far_end_hold_time = max(0, far_end_hold_time - 1);
     end
-%     far_end_hold_time
+
     if far_end_hold_time == 0 && ref_peak < 20
         no_ref_count=min(1000, no_ref_count+1);
     else
         no_ref_count=0;
     end
-%     no_ref_count
+
     ref_e = abs(ref_f).^2;
     for j=1:4
         energy_group(j) = sum(ref_e(BAND_TABLE(2*j-1):BAND_TABLE(2*j)));
@@ -150,14 +131,11 @@ for i=1:size(x_enframe,1)
         end
         [energy_group_parameters(j)] = aec_noise_estimation(energy_group(j), energy_group_parameters(j));
     end
-%     energy_group
     
     stack_ref_low(:, 2:20)=stack_ref_low(:, 1:19);
     stack_ref_low(:, 1)=ref_f(1:32).';
     stack_ref_hi(:,2:16)=stack_ref_hi(:,1:15);
     stack_ref_hi(:,1)=ref_f(33:128).';
-    
-%     no_ref_count
     if no_ref_count < 500
         input_f(1:4)=input_f(1:4).*AEC_HPF_COEFF;
         mic_peak=max(abs(input_t));
@@ -177,7 +155,7 @@ for i=1:size(x_enframe,1)
                 filter_freeze=0;
             end
         end
-        dt_flag_1_debug(i)=dt_flag;
+
         for k=1:32
             est_fir_early=stack_ref_low(k,1:4) * fir_coeff_low(k,1:4)';
             est_adf_early=stack_ref_low(k,1:4) * adf_coeff_low(k,1:4)';
@@ -194,9 +172,6 @@ for i=1:size(x_enframe,1)
             mse_fir(k)=0.9735*mse_fir(k)+(1-0.9735)*err_fir_e;
             mse_adf(k)=0.9735*mse_adf(k)+(1-0.9735)*err_adf_e;
             mse_mic(k)=0.9735*mse_mic(k)+(1-0.9735)*(abs(input_f(k)).^2);
-%             if k == 4
-%                 [adf_coeff_low(k,:)]
-%             end
             
             if mse_adf(k) > mse_mic(k) * 8
                 adf_coeff_low(k,:)=0;
@@ -237,19 +212,10 @@ for i=1:size(x_enframe,1)
             end
             
             B=noise_est_mic_parameters(k).noise_level(1);
-%             if k == 4
-%                 [input_power, erl_ratio(1), tmp, B, filter_freeze]
-%             end
             if input_power * erl_ratio(subband_index) > tmp * B && filter_freeze == 0 % tmp is for dt state threshold
-%                 if k == 4
-%                     1
-%                 end
                 adf_coeff_low(k,:) = adf_coeff_low(k,:) + norm_step * err_adf' * stack_ref_low(k,:);
                 fir_update_flag(k)=1;
             else
-%                 if k == 4
-%                     0
-%                 end
                 fir_update_flag(k)=0;
             end
             
@@ -263,43 +229,25 @@ for i=1:size(x_enframe,1)
                 min_power_early=abs(fir_early_tmp)^2;
                 early_out=fir_early_tmp;
             end
-%             if k == 4
-%                 [err_fir_e, err_adf_e, min_power_early]
-%             end
+
             if err_fir_e > err_adf_e
                 power_ori_mic(k)=err_adf_e;
                 power_echo(k)=est_adf_e;
                 if err_adf_e > min_power_early
                     fir_out(k)=early_out;
-%                     if k == 4
-%                         1
-%                     end
                 else
                     fir_out(k)=err_adf;
-%                     if k == 4
-%                         2
-%                     end
                 end 
             else
                 power_ori_mic(k)=err_fir_e;
                 power_echo(k)=est_fir_e;
                 if err_fir_e > min_power_early
                     fir_out(k)=early_out;
-%                     if k == 4
-%                         3
-%                     end
                 else
                     fir_out(k)=err_fir;
-%                     if k == 4
-%                         4
-%                     end
                 end
             end
             fir_est_ref(k)=input_f(k)-fir_out(k);
-            
-%             if k == 4
-%                 [early_out, err_adf, err_fir, fir_out(k)]                
-%             end
         end
         
         for k = 1:2
@@ -401,8 +349,7 @@ for i=1:size(x_enframe,1)
         for k=127:128
             fir_out(k)=0;
         end
-        fir_out_debug(i,1:5)=fir_out(1:5);
-        fir_out_debug(i,6:10) = fir_out(125:129);
+
         total_input_f(1:129)=fir_out(1:129);
         stack_est_ref(:,2:6) = stack_est_ref(:, 1:5);
         stack_est_ref(:, 1) = fir_est_ref.';
@@ -442,10 +389,6 @@ for i=1:size(x_enframe,1)
         
         % nl_coeff1 is very much close to 1
         [nlp_parameters, nl_coeff1, fir_out] = nlp(nlp_parameters, ref_peak, fir_out, input_f_e, input_f, input_r, far_end_hold_time, WEB_RTC_AEC_NL_WEIGHT_CURVE);
-        fir_out_debug(i,1:5)=fir_out(1:5);
-        fir_out_debug(i,6:10) = fir_out(125:129);
-        nl_coeff1_debug(i,1:5)=nl_coeff1(1:5);
-        nl_coeff1_debug(i,6:10)=nl_coeff1(125:129);
         fir_out_e = abs(fir_out).^2;
         
         % double_talk
@@ -512,7 +455,6 @@ for i=1:size(x_enframe,1)
         E=doubletalk_2_parameters.noise_level(1);
         mic_ratio_level = mic_spk_ratio / E;
         dt_flag = 0;
-        dt_flag_strict = 0;
         if dt_frame_count < 10
             dt_frame_count = dt_frame_count +1;
         else
@@ -531,26 +473,9 @@ for i=1:size(x_enframe,1)
                     dt_flag = 0;
                 end
             end
-            
-            if mic_ratio_level > 50 && mic_snr > 100
-                dt_count_strict = 40;
-            else
-                dt_count_strict = max(0, dt_count_strict -1);
-            end
-            
-            if far_end_hold_time == 0
-                dt_flag_strict = 1;
-            else
-                if dt_count_strict > 0
-                    dt_flag_strict = 2;
-                else
-                    dt_flag_strict = 0;
-                end
-            end
         end
-%         dt_frame_count
-%         far_end_hold_time
-        dt_flag_debug(i,:) = [dt_flag, dt_flag_strict];
+
+
         if dt_flag == 0
             for k = 3:125
                 [noise_est_mic_parameters(k)] = aec_noise_estimation(power_ori_mic(k), noise_est_mic_parameters(k));
@@ -559,15 +484,11 @@ for i=1:size(x_enframe,1)
     else
         total_input_f(1:129) = input_f_bak;
     end
-    
-    total_input_1_f_debug(i, 1:5) = total_input_f(1:5);
-    total_input_1_f_debug(i, 6:10) = total_input_f(125:129);
-    
+
     % deal with 2nd mic, should not used if not for efficiency purpose
     input_f2=x2_f(i,:);
     input_f2_bak=input_f2;
-    ori_2_debug(i,1:5)=input_f2(1:5);
-    ori_2_debug(i,6:10)=input_f2(125:129);
+
     if no_ref_count < 500
         input_f2(1:4)=input_f2(1:4).*AEC_HPF_COEFF;
         %retf process
@@ -578,9 +499,6 @@ for i=1:size(x_enframe,1)
             est_ref_adf = stack_est_ref(k,:) * adf_coeff_2(k, :)';
             err_fir = input_f2(k) - est_ref_fir;
             err_adf = input_f2(k) - est_ref_adf;
-%             if k == 3
-%                 [stack_est_ref(k, :), adf_coeff_2(k, :)]
-%             end
             mu = 0.5 / (sum(abs(stack_est_ref(k, :).^2)) + 0.01);
             err_fir_e = abs(err_fir).^2;
             err_adf_e = abs(err_adf).^2;
@@ -609,23 +527,8 @@ for i=1:size(x_enframe,1)
             end
             
             if fir_update_flag(k) == 1
-%                 if k == 3
-%                     1
-%                     [mu, err_adf]
-%                 end
                 adf_coeff_2(k,:) = adf_coeff_2(k,:) + mu * err_adf' * stack_est_ref(k,:);
-            else
-%                 if k == 3
-%                     0
-%                 end
             end
-%             if k == 3
-%                 adf_coeff_2(k, :)
-%             end
-            
-%             if k == 3
-%                 [err_adf, err_fir, input_f2(k)]
-%             end
             
             if err_adf_e <= err_fir_e && err_adf_e < input_f2_e(k)
                 fir_out2(k) = err_adf; 
@@ -635,8 +538,7 @@ for i=1:size(x_enframe,1)
                 fir_out2(k) = input_f2(k);
             end      
         end
-        fir_out_2_debug(i, 1:5) = fir_out2(1:5);
-        fir_out_2_debug(i, 6:10) = fir_out2(125:129);
+
         fir_out2 = fir_out2 .* min(1, abs(total_input_f(1:129)) .* abs(input_f2_bak) ./ (abs(fir_out2) .* abs(input_f_bak) + 10^-10));    
         total_input_f(130:258) = fir_out2;
         
@@ -645,10 +547,7 @@ for i=1:size(x_enframe,1)
     else
         total_input_f(130:258)=input_f2_bak;
     end
-    nl_coeff2_debug(i,1:5) = nl_coeff2(1:5);
-    nl_coeff2_debug(i,6:10) = nl_coeff2(125:129);
 
-    dt_flag_before_post(i) = dt_flag;
     if no_ref_count < 500
         nl_coeff=mean([nl_coeff1;nl_coeff2]);
         nlp_overdrive = mean([nlp_parameters.over_drive, nlp_parameters2.over_drive]);
@@ -659,7 +558,6 @@ for i=1:size(x_enframe,1)
         [post_parameters] = aec_noise_estimation(nl_coeff_mean, post_parameters);
         G=post_parameters.noise_level(1);
         nlp_snr = nl_coeff_mean/(G + 10^-10);
-        nlp_snr_debug(i, :) = [nl_coeff_mean, G];
         if dt_flag ~= 0 && nlp_snr > 3
             dt_hold_age = 40;
         else
@@ -696,26 +594,9 @@ for i=1:size(x_enframe,1)
     if no_ref_count > 20
         dt_flag = 1;
     end
-    post_debug(i,:)=[dt_hold_age, no_ref_count];
+
     total_input_f_pcm(i, :) = total_input_f;
-    
-    dt_flag_after_post(i) = dt_flag;
-        
-%     if i == 500
-%        save fir_out_debug.mat fir_out_debug
-%        save nl_coeff1_debug.mat nl_coeff1_debug
-%        save nl_coeff2_debug.mat nl_coeff2_debug
-%        save dt_flag_debug.mat dt_flag_debug
-%        save dt_flag_1_debug.mat dt_flag_1_debug
-%        save total_input_1_f_debug.mat total_input_1_f_debug
-%        save dt_flag_before_post.mat dt_flag_before_post
-%        save dt_flag_after_post.mat dt_flag_after_post
-%        save post_debug.mat post_debug
-%        save nlp_snr_debug.mat nlp_snr_debug
-%        save fir_out_2_debug.mat fir_out_2_debug
-%        save ori_2_debug.mat ori_2_debug
-%        pause;
-%     end
+ 
 end
 close(hh);
 end
