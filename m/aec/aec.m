@@ -578,7 +578,10 @@ for i=1:size(x_enframe,1)
             est_ref_adf = stack_est_ref(k,:) * adf_coeff_2(k, :)';
             err_fir = input_f2(k) - est_ref_fir;
             err_adf = input_f2(k) - est_ref_adf;
-            mu = 0.5 / (sum(abs(stack_est_ref(k, :).^2) + 0.01));
+%             if k == 3
+%                 [stack_est_ref(k, :), adf_coeff_2(k, :)]
+%             end
+            mu = 0.5 / (sum(abs(stack_est_ref(k, :).^2)) + 0.01);
             err_fir_e = abs(err_fir).^2;
             err_adf_e = abs(err_adf).^2;
             mse_fir2(k) = 0.9608 * mse_fir2(k) + (1-0.9608) * err_fir_e;
@@ -606,13 +609,26 @@ for i=1:size(x_enframe,1)
             end
             
             if fir_update_flag(k) == 1
+%                 if k == 3
+%                     1
+%                     [mu, err_adf]
+%                 end
                 adf_coeff_2(k,:) = adf_coeff_2(k,:) + mu * err_adf' * stack_est_ref(k,:);
+            else
+%                 if k == 3
+%                     0
+%                 end
             end
+%             if k == 3
+%                 adf_coeff_2(k, :)
+%             end
             
-            if err_fir_e >= err_adf_e && err_adf_e < input_f2_e(k)
-                fir_out2(k) = err_adf;
-            elseif err_fir_e >= err_adf_e && err_adf_e >= input_f2_e(k)
-                fir_out2(k) = input_f2(k); 
+%             if k == 3
+%                 [err_adf, err_fir, input_f2(k)]
+%             end
+            
+            if err_adf_e <= err_fir_e && err_adf_e < input_f2_e(k)
+                fir_out2(k) = err_adf; 
             elseif err_fir_e < err_adf_e && err_fir_e < input_f2_e(k)
                 fir_out2(k) = err_fir;
             else
@@ -621,11 +637,11 @@ for i=1:size(x_enframe,1)
         end
         fir_out_2_debug(i, 1:5) = fir_out2(1:5);
         fir_out_2_debug(i, 6:10) = fir_out2(125:129);
-        fir_out2 = fir_out2 .* min(1, abs(total_input_f(1:129)) .* abs(input_f2_bak) / (abs(fir_out2) .* abs(input_f_bak) + 10^-10));    
+        fir_out2 = fir_out2 .* min(1, abs(total_input_f(1:129)) .* abs(input_f2_bak) ./ (abs(fir_out2) .* abs(input_f_bak) + 10^-10));    
         total_input_f(130:258) = fir_out2;
         
-        input_f_e2 = abs(input_f2).^2;
-        [nlp_parameters2, nl_coeff2, ~] = nlp(nlp_parameters2, ref_peak, fir_out2, input_f_e2, input_f2, input_r, far_end_hold_time, WEB_RTC_AEC_NL_WEIGHT_CURVE); 
+        input_f_e2 = abs(input_f2_bak).^2;
+        [nlp_parameters2, nl_coeff2, ~] = nlp(nlp_parameters2, ref_peak, fir_out2, input_f_e2, input_f2_bak, input_r, far_end_hold_time, WEB_RTC_AEC_NL_WEIGHT_CURVE); 
     else
         total_input_f(130:258)=input_f2_bak;
     end
@@ -685,21 +701,21 @@ for i=1:size(x_enframe,1)
     
     dt_flag_after_post(i) = dt_flag;
         
-    if i == 485
-       save fir_out_debug.mat fir_out_debug
-       save nl_coeff1_debug.mat nl_coeff1_debug
-       save nl_coeff2_debug.mat nl_coeff2_debug
-       save dt_flag_debug.mat dt_flag_debug
-       save dt_flag_1_debug.mat dt_flag_1_debug
-       save total_input_1_f_debug.mat total_input_1_f_debug
-       save dt_flag_before_post.mat dt_flag_before_post
-       save dt_flag_after_post.mat dt_flag_after_post
-       save post_debug.mat post_debug
-       save nlp_snr_debug.mat nlp_snr_debug
-       save fir_out_2_debug.mat fir_out_2_debug
-       save ori_2_debug.mat ori_2_debug
-       pause;
-    end
+%     if i == 500
+%        save fir_out_debug.mat fir_out_debug
+%        save nl_coeff1_debug.mat nl_coeff1_debug
+%        save nl_coeff2_debug.mat nl_coeff2_debug
+%        save dt_flag_debug.mat dt_flag_debug
+%        save dt_flag_1_debug.mat dt_flag_1_debug
+%        save total_input_1_f_debug.mat total_input_1_f_debug
+%        save dt_flag_before_post.mat dt_flag_before_post
+%        save dt_flag_after_post.mat dt_flag_after_post
+%        save post_debug.mat post_debug
+%        save nlp_snr_debug.mat nlp_snr_debug
+%        save fir_out_2_debug.mat fir_out_2_debug
+%        save ori_2_debug.mat ori_2_debug
+%        pause;
+%     end
 end
 close(hh);
 end
