@@ -92,11 +92,14 @@ file_id=fopen('out_aec_0_0.pcm','wb');
 fwrite(file_id, out1,'int16');
 fclose(file_id);
 
-subplot(2,1,1);
+subplot(3,1,1);
 plot(out1);
 grid on;
-subplot(2,1,2);
+subplot(3,1,2);
 specgram(out1, 2048, 16000, 2048, 1024);
+colorbar;
+subplot(3,1,3);
+specgram(out2, 2048, 16000, 2048, 1024);
 colorbar;
 % % Plot the STFT result
 % set(gcf, 'Position', [20 100 600 500]);
