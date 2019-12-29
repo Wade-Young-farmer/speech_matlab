@@ -4,24 +4,17 @@ clear all;
 % 这不是sin函数求幅频响应的方式
 t=0:0.01:4.99;
 x=cos(2*pi*t);
-figure;
-plot(t, x);
+% figure;
+% plot(t, x);
 X=fft(x);
 Y=fft(x(1:50));
 Z=fft(x(1:100));
-figure;
-plot(abs(X), '*');
+% figure;
+% plot(abs(X), '*');
+% % hold on;
+% % plot(abs(Y), '*');
 % hold on;
-% plot(abs(Y), '*');
-hold on;
-stem(abs(Z));
-
-% 这不是窗函数的幅频响应求的方式
-x1=zeros(1, 100);
-x1(40:1:59)=1;
-y1=fft(x1);
-figure;
-plot(abs(y1));
+% stem(abs(Z));
 
 %{
 --------------------------------------------------------------------------- 
@@ -34,7 +27,16 @@ File:Matlab的窗函数,矩形窗
 %==========================================================================
 %求矩形窗的频率响应图  
 %==========================================================================
-W = linspace(pi/4096,pi,4096);
+W = linspace(0,2*pi - 2*pi/512,512);
+wn0 = rectwin(12);   %矩形窗函数
+[h0,w0] = freqz(wn0,1,W);
+figure;
+plot(w0, 20*log10(abs(h0/max(h0))));
+hold on;
+WN0=fft(wn0, 512);
+plot(W, 20*log10(abs(WN0)/max(abs(WN0))), 'r');
+
+W = linspace(-pi + 2*pi/4096,pi,4096);
 wn0 = rectwin(768);   %矩形窗函数 
 wn1 = hamming(768);
 wn2 = hanning(768);
@@ -231,31 +233,28 @@ filter_coeff=[-0.000030328878, -0.000030577072, -0.000031071936, -0.000031810440
         -0.000037089977, -0.000035435750, -0.000033998941, -0.000032788081, ...
         -0.000031810440, -0.000031071936, -0.000030577072, -0.000030328878];
 wn3=filter_coeff;
-figure;
-plot(wn3);
+% figure;
+% plot(wn3);
 %20*log10(abs(WN))  
 [h0,w0] = freqz(wn0,1,W); 
 [h1,w1]=freqz(wn1,1, W);
 [h2,w2]=freqz(wn2,1, W);
 [h3,w3]=freqz(wn3,1, W);
 
-
-%subplotfigure(5,1,1);  
 figure;
-plot(w0/pi,20*log10(abs(h1/max(h1)))); 
+% plot(w0/pi,20*log10(abs(h1/max(h1)))); 
+% hold on;
+% plot(w0/pi, 20*log10(abs(h0/max(h2))));
+% hold on;
+% plot(w0/pi, 20*log10(abs(h2/max(h2))), 'g');
 hold on;
-plot(w0/pi, 20*log10(abs(h0/max(h2))));
-hold on;
-plot(w0/pi, 20*log10(abs(h2/max(h2))), 'g');
-hold on;
-plot(w0/pi, 20*log10(abs(h3/max(h3))));
-
-axis([0 0.1 -200 0]); 
+plot(w0/pi, 20*log10(abs(h3/max(h3))), 'b');
+axis([-0.1 0.1 -200 0]); 
 xlabel('归一化频率 /\pi');  
 ylabel('20log_{10}|W(e^{j\omega})| /dB');  
 title('矩形窗的傅里叶变换'); 
 set(gca,'YTick',[-100 -80 -60 -40 -20 0]*2)  
-set(gca,'XTick',[0:0.01:0.1])   
+set(gca,'XTick',[-0.1:0.01:0.1])   
 %set(gca,'XAxisLocation','top');%设置X轴在上方  
 set(gca,'XAxisLocation','bottom');%设置X轴在下方  
 set(gca,'YAxisLocation','left'); %设置Y轴在左方  
