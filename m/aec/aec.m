@@ -24,6 +24,10 @@ fir_coeff_low=zeros(32,20);
 adf_coeff_low=zeros(32,20);
 fir_coeff_hi=zeros(96, 16);
 adf_coeff_hi=zeros(96, 16);
+delay_monitor = 0;
+no_delay_monitor = 0;
+echo_delay_monitor = 0;
+no_echo_delay_monitor = 0;
 mse_fir=zeros(1, 129);
 mse_adf=zeros(1, 129);
 mse_mic=zeros(1, 129);
@@ -155,7 +159,6 @@ for i=1:size(x_enframe,1)
                 filter_freeze=0;
             end
         end
-
         for k=1:32
             est_fir_early=stack_ref_low(k,1:4) * fir_coeff_low(k,1:4)';
             est_adf_early=stack_ref_low(k,1:4) * adf_coeff_low(k,1:4)';
@@ -218,7 +221,7 @@ for i=1:size(x_enframe,1)
             else
                 fir_update_flag(k)=0;
             end
-            
+              
             adf_early_tmp=input_f(k)-est_adf_early;
             fir_early_tmp=input_f(k)-est_fir_early;
             
@@ -349,7 +352,14 @@ for i=1:size(x_enframe,1)
         for k=127:128
             fir_out(k)=0;
         end
-
+        adf_coeff_sum = sum(adf_coeff_low.^2) + [sum(adf_coeff_hi.^2), zeros(1, 4)];
+        [max_val, max_index]=max(adf_coeff_sum);
+        if max_index ~= 1
+            delay_monitor = delay_monitor + 1;
+        else
+            no_delay_monitor = no_delay_monitor + 1;
+        end
+        
         total_input_f(1:129)=fir_out(1:129);
         stack_est_ref(:,2:6) = stack_est_ref(:, 1:5);
         stack_est_ref(:, 1) = fir_est_ref.';
@@ -439,6 +449,7 @@ for i=1:size(x_enframe,1)
         
         D=doubletalk_1_parameters.noise_level(1);
         mic_snr = dt_mic_psd_sum / D;
+        
         if dt_frame_count < 10
             mic_ratio_smooth = mic_spk_ratio;
         else
@@ -456,7 +467,7 @@ for i=1:size(x_enframe,1)
         mic_ratio_level = mic_spk_ratio / E;
         dt_flag = 0;
         if dt_frame_count < 10
-            dt_frame_count = dt_frame_count +1;
+            dt_frame_count = dt_frame_count + 1;
         else
             if mic_ratio_level > 10 && mic_snr > 50
                 dt_count =40;
@@ -474,7 +485,6 @@ for i=1:size(x_enframe,1)
                 end
             end
         end
-
 
         if dt_flag == 0
             for k = 3:125
@@ -538,6 +548,14 @@ for i=1:size(x_enframe,1)
                 fir_out2(k) = input_f2(k);
             end      
         end
+        
+        adf2_coeff_sum = sum(adf_coeff_2.^2);
+        [max_val, max_index] = max(adf2_coeff_sum);
+        if max_index ~= 1
+            echo_delay_monitor = echo_delay_monitor + 1;
+        else
+            no_echo_delay_monitor = no_echo_delay_monitor + 1;
+        end
 
         fir_out2 = fir_out2 .* min(1, abs(total_input_f(1:129)) .* abs(input_f2_bak) ./ (abs(fir_out2) .* abs(input_f_bak) + 10^-10));    
         total_input_f(130:258) = fir_out2;
@@ -582,6 +600,10 @@ for i=1:size(x_enframe,1)
         end
 
         tmp_ = nl_coeff .^ over_drive_tmp;
+%         if i == 1000
+%              plot(abs(nl_coeff(3:125)));
+%              pause;
+%         end
         if dt_flag == 2
            tmp_ = max(tmp_, 0.1);
         elseif dt_flag == 0
@@ -599,4 +621,6 @@ for i=1:size(x_enframe,1)
  
 end
 close(hh);
+[delay_monitor, no_delay_monitor]
+[echo_delay_monitor, no_echo_delay_monitor]
 end
