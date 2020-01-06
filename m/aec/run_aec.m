@@ -76,7 +76,13 @@ BAND_TABLE= [2, 8, 9, 18, 19, 47, 48, 124];
 BAND_TABLE=BAND_TABLE+1;
 
 tic;
-total_input_f_pcm=aec('input_data/rec_mic_0_0_short.pcm', 'input_data/rec_mic_1_0_short.pcm', 'input_data/rec_spk_l_0_short.pcm', filter_coeff, WEB_RTC_AEC_NL_WEIGHT_CURVE, DOUBLETALK_BAND_TABLE, BAND_TABLE);
+[total_input_f_pcm, indexs_1, indexs_2]=aec('input_data/test/aud_rec/rec_mic_0_0.pcm', 'input_data/test/aud_rec/rec_mic_1_0.pcm', 'input_data/test/aud_rec/rec_spk_l_0.pcm', filter_coeff, WEB_RTC_AEC_NL_WEIGHT_CURVE, DOUBLETALK_BAND_TABLE, BAND_TABLE);
+
+figure;
+pcm_size = size(indexs_1, 2);
+scatter(1:pcm_size, indexs_1, 10, 'filled')
+hold on;
+plot(indexs_2)
 toc;
 disp(['运行时间: ',num2str(toc)]);
 tmp1 = total_input_f_pcm(:,1:129);
@@ -92,6 +98,7 @@ file_id=fopen('out_aec_0_0.pcm','wb');
 fwrite(file_id, out1,'int16');
 fclose(file_id);
 
+figure;
 subplot(3,1,1);
 plot(out1);
 grid on;

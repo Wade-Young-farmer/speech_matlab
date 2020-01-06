@@ -1,4 +1,4 @@
-function total_input_f_pcm=aec(mic_name, mic_name_2, ref_name, filter_coeff, WEB_RTC_AEC_NL_WEIGHT_CURVE, DOUBLETALK_BAND_TABLE, BAND_TABLE)
+function [total_input_f_pcm,indexs_1,indexs_2]=aec(mic_name, mic_name_2, ref_name, filter_coeff, WEB_RTC_AEC_NL_WEIGHT_CURVE, DOUBLETALK_BAND_TABLE, BAND_TABLE)
 [r_enframe, r_f]=hpf(ref_name, filter_coeff);
 [x_enframe, x_f]=hpf(mic_name, filter_coeff);
 [x2_enframe, x2_f]=hpf(mic_name_2, filter_coeff);
@@ -28,6 +28,7 @@ delay_monitor = 0;
 no_delay_monitor = 0;
 echo_delay_monitor = 0;
 no_echo_delay_monitor = 0;
+
 mse_fir=zeros(1, 129);
 mse_adf=zeros(1, 129);
 mse_mic=zeros(1, 129);
@@ -79,6 +80,8 @@ hh=waitbar(0, 'data is being processed');
 pcm_size=size(x_enframe,1);
 
 total_input_f_pcm=zeros(pcm_size, 258);
+indexs_1 = ones(1, pcm_size);
+indexs_2 = ones(1, pcm_size);
 for i=1:size(x_enframe,1)
     str=[num2str(i), ' / ', num2str(pcm_size), ' processed']; 
     waitbar(i/pcm_size, hh, str); 
@@ -354,6 +357,7 @@ for i=1:size(x_enframe,1)
         end
         adf_coeff_sum = sum(adf_coeff_low.^2) + [sum(adf_coeff_hi.^2), zeros(1, 4)];
         [max_val, max_index]=max(adf_coeff_sum);
+        indexs_1(i) = max_index;
         if max_index ~= 1
             delay_monitor = delay_monitor + 1;
         else
@@ -551,6 +555,7 @@ for i=1:size(x_enframe,1)
         
         adf2_coeff_sum = sum(adf_coeff_2.^2);
         [max_val, max_index] = max(adf2_coeff_sum);
+        indexs_2(i) = max_index;
         if max_index ~= 1
             echo_delay_monitor = echo_delay_monitor + 1;
         else
@@ -623,4 +628,7 @@ end
 close(hh);
 [delay_monitor, no_delay_monitor]
 [echo_delay_monitor, no_echo_delay_monitor]
+
+save indexs_1.mat indexs_1;
+save indexs_2.mat indexs_2;
 end
