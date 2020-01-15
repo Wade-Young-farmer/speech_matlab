@@ -9,7 +9,7 @@ for k=1 : fn
     u=y(:,k);                           % 取一帧数据
     ru=xcorr(u);                        % 计算自相关函数
     ru0=ru(wlen);                       % 取主峰值
-    ru1=max(ru(wlen+17:wlen+133));      % 取第一个副峰值
+    ru1=max(ru(wlen+17:wlen+133));      % 取第一个副峰值, 利用基音检测
     R1(k)=ru0/ru1;                      % 计算主副峰比值
 end
 Rum=multimidfilter(R1,20);              % 平滑处理

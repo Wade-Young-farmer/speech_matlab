@@ -25,7 +25,7 @@ subplot 312; plot(time,signal,'k');
 title(['加噪语音波形(信噪比' num2str(SNR) 'dB)']);
 ylabel('幅值'); axis([0 max(time) -1 1]);
 subplot 313; plot(frameTime,Rum,'k');
-title('短时自相关函数'); axis([0 max(time) 0 1.2]);
+title('短时互相关函数'); axis([0 max(time) 0 1.2]);
 xlabel('时间/s'); ylabel('幅值'); 
 line([0,frameTime(fn)], [T1 T1], 'color','k','LineStyle','--');
 line([0,frameTime(fn)], [T2 T2], 'color','k','LineStyle','-');
