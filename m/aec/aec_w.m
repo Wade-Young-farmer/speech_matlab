@@ -1,13 +1,13 @@
 % Partitioned block frequency domain adaptive filtering NLMS and 
 % standard time-domain sample-based NLMS 
 %fid=fopen('aecFar-samsung.pcm', 'rb'); % Load far end
-fid=fopen('aecFar.pcm', 'rb'); % Load far end
+fid=fopen('input_data/rec_spk_l_0_short.pcm', 'rb'); % Load far end
 %fid=fopen(farFile, 'rb'); % Load far end
 rrin=fread(fid,inf,'int16');
 fclose(fid); 
 %rrin=loadsl('data/far_me2.pcm'); % Load far end
 %fid=fopen('aecNear-samsung.pcm', 'rb'); % Load near end
-fid=fopen('aecNear.pcm', 'rb'); % Load near end
+fid=fopen('input_data/rec_mic_0_0_short.pcm', 'rb'); % Load near end
 %fid=fopen(nearFile, 'rb'); % Load near end
 ssin=fread(fid,inf,'int16');
 %ssin = [zeros(1024,1) ; ssin(1:end-1024)];
@@ -156,14 +156,16 @@ Sxd = zeros(N+1,1);
 SxdBad = zeros(N+1,1);
 hnledp=[];
 cohxdMax = 0;
-%hh=waitbar(0,'Please wait...');
-progressbar(0);
+hh=waitbar(0,'Please wait...');
+% progressbar(0);
 %spaces = ' ';
 %spaces = repmat(spaces, 50, 1);
 %spaces = ['[' ; spaces ; ']'];
 %fprintf(1, spaces);
 %fprintf(1, '\n');
 for kk=1:Nb
+    str=[num2str(kk), ' / ', num2str(Nb), ' processed']; 
+    waitbar(kk/Nb, hh, str);
     pos = N * (kk-1) + start;
     
     % FD block method
@@ -174,11 +176,11 @@ for kk=1:Nb
     xx = [xo;xk];
     xo = xk;
     tmp = fft(xx); 
-	XX = tmp(1:N+1);
+	XX = tmp(1:N+1); % speaker
 	dd = [do;dk];  % Overlap
 	do = dk;
 	tmp = fft(dd); % Frequency domain 
-	DD = tmp(1:N+1);
+	DD = tmp(1:N+1); % microphone
     
     % ------------------------  Power estimation
     pn0 = (1 - alp) * pn0 + alp * real(XX.* conj(XX));
@@ -191,7 +193,8 @@ for kk=1:Nb
 		mm = min(Sy,Sym);  
 		diff = Sym - mm;
 		if (kk>50)
-			Sym = (mm + step*diff) * ramp; % Estimated background noise power   
+			Sym = (mm + step*diff) * ramp; % Estimated background noise power
+            % 上式类似与NS最小值跟踪，但是不一样 （改进点之一）
 		end
 	end
     
@@ -204,9 +207,11 @@ for kk=1:Nb
     yfk = sum(YFb,2);
 	tmp = [yfk ; flipud(conj(yfk(2:N)))];
     ykt = real(ifft(tmp));
-    ykfb = ykt(end-N+1:end); 
+    ykfb = ykt(end-N+1:end);
+    
     
     % ----------------------   Error estimation 
+    % 时域相减，求出残余信号
     ekfb = dk - ykfb; 
     %if sum(abs(ekfb)) < sum(abs(dk))
         %ekfb = dk - ykfb; 
@@ -218,6 +223,7 @@ for kk=1:Nb
 	%(kk-1)*(N*2)+1
     erfb(pos:pos+N-1) = ekfb; 
     tmp = fft([zm;ekfb]);      % FD version for cancelling part (overlap-save)
+    % zero-padding, 平滑频谱
 	Ek = tmp(1:N+1);
     % ------------------------  Adaptation  
 	Ek2 = Ek ./(M*pn + 0.001); % Normalized error
@@ -226,24 +232,37 @@ for kk=1:Nb
 	
 	absEf = max(abs(Ek2), threshold);
 	absEf = ones(N+1,1)*threshold./absEf;
+%     size(absEf)
+%     pause;
 	Ek2 = Ek2.*absEf;
+    % 让Ek2不会超过门限
 	
 	mEk = mufb.*Ek2;
-	PP = conj(XFm).*(ones(M,1) * mEk')'; 
+	PP = conj(XFm).*(ones(M,1) * mEk')';
+%     size(PP)
 	tmp = [PP ; flipud(conj(PP(2:N,:)))];
 	IFPP = real(ifft(tmp));
 	PH = IFPP(1:N,:);
 	tmp = fft([PH;zeros(N,M)]);
 	FPH = tmp(1:N+1,:);
+%     size(FPH)
+%     pause;
 	WFb = WFb + FPH;
+    % 频域变换到时域，时域又取前半帧变换回频域, 这比我们麻烦
     if mod(kk, 10*mult) == 0
         WFbEn = sum(real(WFb.*conj(WFb)));
         %WFbEn = sum(abs(WFb));
         [tmp, dIdx] = max(WFbEn);
+        % 相当于没有求和
         WFbD = sum(abs(WFb(:, dIdx)),2);
+%         WFbD == abs(WFb(:, dIdx))
+%         size(WFb(:, dIdx))
         %WFbD = WFbD / (mean(WFbD) + 1e-10); 
         WFbD = min(max(WFbD, 0.5), 4);
+%         size(WFbD)
+%         pause;
     end
+    % aec里fir系数的延时， 每80ms(20帧或者10帧)求一次
     dIdxV(kk) = dIdx;
     
 	% NLP
@@ -743,7 +762,7 @@ for kk=1:Nb
 	%end
 	if mod(kk, floor(Nb/100)) == 0
 	%if mod(kk, floor(Nb/500)) == 0
-        progressbar(kk/Nb); 
+%         progressbar(kk/Nb); 
         %figure(5)
         %plot(abs(WFb));
         %legend('1','2','3','4','5','6','7','8','9','10','11','12');
@@ -775,7 +794,8 @@ for kk=1:Nb
         %overdrive
     end
 end
-progressbar(1);
+close(hh);
+% progressbar(1);
 %figure(2);
 %plot([feat(:,1) feat(:,2)+1 feat(:,3)+2 mfeat+3]);
 %plot([feat(:,1) mfeat+1]);
