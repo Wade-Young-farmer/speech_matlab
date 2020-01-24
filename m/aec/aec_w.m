@@ -1,3 +1,6 @@
+close all;
+clear all;
+clc;
 % Partitioned block frequency domain adaptive filtering NLMS and 
 % standard time-domain sample-based NLMS 
 %fid=fopen('aecFar-samsung.pcm', 'rb'); % Load far end
@@ -852,10 +855,10 @@ plot(t, hnlPrefAvgV, 'm');
 %plot(overdrive, 'g');
 %plot(erfb(N*(1:floor(length(erfb)/N)))/max(abs(erfb)));
 hold off
-tightx;
+axis tight;
 figure(11)
 plot(t, ovrdV);
-tightx;
+axis tight;
 %plot(mfeat,'r');
 %plot(1-cohxyp_,'r');
 %plot(Hnlxydp,'y');
@@ -876,7 +879,7 @@ tightx;
 figure(12)
 plot(t, dIdxV);
 %plot(t, SLxV);
-tightx;
+axis tight;
 %figure(13)
 %plot(t, [ekEnV dkEnV]);
 %plot(t, dkEnV./(ekEnV+1e-10));
