@@ -53,6 +53,7 @@ else
     echoBandRange = ceil(300*2/fs*N):floor(1800*2/fs*N);
     %echoBandRange = ceil(300*2/fs*N):floor(1800*2/fs*N);
 end
+% echoBandRange
 %echoBandRange = ceil(1600*2/fs*N):floor(1900*2/fs*N);
 %echoBandRange = ceil(2000*2/fs*N):floor(4000*2/fs*N);
 suppState = 1;
@@ -270,6 +271,7 @@ for kk=1:Nb
         
         ee = [eo;ekfb]; 
         eo = ekfb;
+        % 用的是hanning窗，且只有在nlp时候才加窗
 		window = wins;
         if fs == 8000
             %gamma = 0.88;
@@ -291,6 +293,7 @@ for kk=1:Nb
         dfm(:,1) = df;
         
         SxOld = Sx;
+        % ef, df都是最新的信号，xf是对应帧的远端信号
 		Se = gamma*Se + (1-gamma)*real(ef.*conj(ef));
 		Sd = gamma*Sd + (1-gamma)*real(df.*conj(df));
 		Sx = gamma*Sx + (1 - gamma)*real(xf.*conj(xf));
@@ -323,6 +326,7 @@ for kk=1:Nb
         %Sxd(end:1) = filter(freqSm, [1 -(1-freqSm)], Sxd(end:1));
         %Sed = filter(freqSm, [1 -(1-freqSm)], Sed);
         %Sed(end:1) = filter(freqSm, [1 -(1-freqSm)], Sed(end:1));
+        % 相关系数的平方
 		cohed = real(Sed.*conj(Sed))./(Se.*Sd + 1e-10);
         %cohedAvg(kk) = mean(cohed(echoBandRange));
         %cohedAvg(kk) = cohed(6);
@@ -348,10 +352,12 @@ for kk=1:Nb
         %hnled(xIdx) = 1 - cohxd(xIdx);
         %hnled = 1 - max(cohxd, 1-cohedFast);
         hnled = min(1 - cohxd, cohed);
+        % 越大，说明越不需要消回声
         %hnled = 1 - cohxd;
         %hnled = max(1 - (cohxd + (1-cohedFast)), 0);
         %hnled = 1 - max(cohxd, 1-cohed);
         if kk > 1
+            % 这种形式表示，主要是为了作图吧？
             cohxdSlow(kk,:) = 0.99*cohxdSlow(kk-1,:) + 0.01*cohxd';
             cohedSlow(kk,:) = 0.99*cohedSlow(kk-1,:) + 0.01*(1-cohed)';
         end
@@ -367,6 +373,7 @@ for kk=1:Nb
                 overdrive = max(log(avgHnl)/log(0.99), 1);
             end
             weight(4:end) = max(hnlMax) - hnlMax(4:end);
+%             message('running!');
         end
         
         
@@ -409,6 +416,7 @@ for kk=1:Nb
 		%hnledp = [hnledp ; mean(hnled)];
 		%hnled(floor(N/2):end) = hnled(floor(N/2):end).^2;
 		%ef = ef.*((weight*(min(1 - hnled)).^2 + (1 - weight).*(1 - hnled)).^2);
+        % 残余信号和近端信号的相关性，求均值，越大越没有回声
         cohedMean = mean(cohed(echoBandRange));
         %aggrFact = 4*(1-mean(hnled(echoBandRange))) + 1;
         %[hnlSort, hnlSortIdx] = sort(hnled(echoBandRange));
@@ -416,6 +424,7 @@ for kk=1:Nb
         [xSort, xSortIdx] = sort(Sx);
         %aggrFact = (1-mean(hnled(echoBandRange)));
         %hnlSortQ = hnlSort(qIdx);
+        % 远端和近端信号的不相关性，求均值，越大越没有回声
         hnlSortQ = mean(1 - cohxd(echoBandRange));
         %hnlSortQ = mean(1 - cohxd);
         [hnlSort2, hnlSortIdx2] = sort(hnled(echoBandRange));
@@ -424,8 +433,9 @@ for kk=1:Nb
         hnlQuantLow = 0.5;
         qIdx = floor(hnlQuant*length(hnlSort2));
         qIdxLow = floor(hnlQuantLow*length(hnlSort2));
-        hnlPrefAvg = hnlSort2(qIdx);
-        hnlPrefAvgLow = hnlSort2(qIdxLow);
+%         [qIdx, qIdxLow]
+        hnlPrefAvg = hnlSort2(qIdx); % 频点11
+        hnlPrefAvgLow = hnlSort2(qIdxLow); % 频点8
         %hnlPrefAvgLow = mean(hnled);
         %hnlPrefAvg = max(hnlSort2);
         %hnlPrefAvgLow = min(hnlSort2);
@@ -487,6 +497,7 @@ for kk=1:Nb
                 %end
                 suppState = 1;
             end
+            % 落在这两种情况之外的，保持前一帧的状态
             if hnlSortQ < cohxdLocalMin & hnlSortQ < 0.75
                 cohxdLocalMin = hnlSortQ;
             end
@@ -565,6 +576,7 @@ for kk=1:Nb
         %dkEn = sum(real(dk.^2));
         ekEn = sum(Se);
         dkEn = sum(Sd);
+        % 这其实是线性部分的处理，可以放在滤波器更新的过程中
         if divergeState == 0
             if ekEn > dkEn
                 ef = df;
@@ -586,6 +598,7 @@ for kk=1:Nb
         end
         ekEnV(kk) = ekEn;
         dkEnV(kk) = dkEn;
+        % 用来作图
         hnlLocalMinV(kk) = hnlLocalMin;
         cohxdLocalMinV(kk) = cohxdLocalMin;
         hnlMinV(kk) = hnlMin;
@@ -627,6 +640,7 @@ for kk=1:Nb
         %hnled = weight.*min(hnlSortQ, hnled) + (1 - weight).*hnled;
         %hnlSortQV(kk) = mean(hnled);
         %hnlPrefAvgV(kk) = mean(hnled(echoBandRange));
+        % 使用权重平滑hnled，wCurve分布是让65点中频率越高的点尽可能小
         hnled = weight.*min(hnlPrefAvg, hnled) + (1 - weight).*hnled;
         %od = aggrFact*(sqrt(linspace(0,1,N+1)') + aggrTerm);
         %od = 4*(sqrt(linspace(0,1,N+1)') + 1/4);
@@ -642,6 +656,7 @@ for kk=1:Nb
         %od = 2*ones(N+1,1);
         %sshift = ((1-hnled)*2-1).^3+1; 
         sshift = ones(N+1,1);
+        % 尽量让高频小
         hnled = hnled.^(od.*sshift);
         %if hnlg > 0.75
             %if (suppState ~= 0)
@@ -707,6 +722,7 @@ for kk=1:Nb
 		% Overlap and add in time domain for smoothness 
 		tmp = [Fmix ; flipud(conj(Fmix(2:N)))];
 		mixw = wins.*real(ifft(tmp));
+        % 上一帧的后半段和这一帧的前半段相加，重叠相加法
 		mola  = mbuf(end-N+1:end) + mixw(1:N);
 		mbuf = mixw;
 		ercn(pos:pos+N-1) = mola; 
