@@ -1,4 +1,7 @@
-function [total_input_f_pcm,indexs_1,indexs_2]=aec(mic_name, mic_name_2, ref_name, filter_coeff, WEB_RTC_AEC_NL_WEIGHT_CURVE, DOUBLETALK_BAND_TABLE, BAND_TABLE)
+function [total_input_f_pcm,indexs_1,indexs_2, ...
+    coh_near_res_avg_display, coh_near_ref_avg_display, nl_coeff_fb_display, nl_coeff_fb_low_display ...
+    ]= ...
+    aec(mic_name, mic_name_2, ref_name, filter_coeff, WEB_RTC_AEC_NL_WEIGHT_CURVE, DOUBLETALK_BAND_TABLE, BAND_TABLE)
 [r_enframe, r_f]=hpf(ref_name, filter_coeff);
 [x_enframe, x_f]=hpf(mic_name, filter_coeff);
 [x2_enframe, x2_f]=hpf(mic_name_2, filter_coeff);
@@ -82,7 +85,17 @@ pcm_size=size(x_enframe,1);
 total_input_f_pcm=zeros(pcm_size, 258);
 indexs_1 = ones(1, pcm_size);
 indexs_2 = ones(1, pcm_size);
-for i=1:size(x_enframe,1)
+
+erl_display = zeros(1, pcm_size);
+dt_flag_display = zeros(1, pcm_size);
+over_drive_display = zeros(1, pcm_size);
+% 追踪nlp的相关性系数
+coh_near_res_avg_display = zeros(pcm_size, 1);
+coh_near_ref_avg_display = zeros(pcm_size, 1);
+nl_coeff_fb_display = zeros(pcm_size, 1);
+nl_coeff_fb_low_display = zeros(pcm_size, 1);
+
+for i=1:pcm_size
     str=[num2str(i), ' / ', num2str(pcm_size), ' processed']; 
     waitbar(i/pcm_size, hh, str); 
     
@@ -402,8 +415,12 @@ for i=1:size(x_enframe,1)
         end
         
         % nl_coeff1 is very much close to 1
-        [nlp_parameters, nl_coeff1, fir_out] = nlp(nlp_parameters, ref_peak, fir_out, input_f_e, input_f, input_r, far_end_hold_time, WEB_RTC_AEC_NL_WEIGHT_CURVE);
+        [nlp_parameters, nl_coeff1, fir_out, a, b, c, d] = nlp(nlp_parameters, ref_peak, fir_out, input_f_e, input_f, input_r, far_end_hold_time, WEB_RTC_AEC_NL_WEIGHT_CURVE);
         fir_out_e = abs(fir_out).^2;
+        coh_near_res_avg_display(i) = a;
+        coh_near_ref_avg_display(i) = b;
+        nl_coeff_fb_display(i) = c;
+        nl_coeff_fb_low_display(i) = d;
         
         % double_talk
         % fir_out_e, ref_e, erl_ratio, B, far_end_hold_time
@@ -626,9 +643,18 @@ for i=1:size(x_enframe,1)
  
 end
 close(hh);
-[delay_monitor, no_delay_monitor]
-[echo_delay_monitor, no_echo_delay_monitor]
+% tt = (1:pcm_size)/16000*128;
+% figure(1);
+% plot(tt, coh_near_res_avg_display, 'r');
+% hold on;
+% plot(tt, coh_near_ref_avg_display, 'g');
+% plot(tt, nl_coeff_fb_display, 'y');
+% plot(tt, nl_coeff_fb_low_display, 'k');
+% hold off
+% axis tight;
 
-save indexs_1.mat indexs_1;
-save indexs_2.mat indexs_2;
+% [delay_monitor, no_delay_monitor]
+% [echo_delay_monitor, no_echo_delay_monitor]
+% save indexs_1.mat indexs_1;
+% save indexs_2.mat indexs_2;
 end

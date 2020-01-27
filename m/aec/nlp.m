@@ -1,4 +1,4 @@
-function [parameters, nl_coeff, fir_out]=nlp(parameters, ref_peak, fir_out, input_f_e, input_f, input_r, far_end_hold_time, WEB_RTC_AEC_NL_WEIGHT_CURVE)
+function [parameters, nl_coeff, fir_out, coh_near_ref_avg, coh_near_res_avg, nl_coeff_fb, nl_coeff_fb_low]=nlp(parameters, ref_peak, fir_out, input_f_e, input_f, input_r, far_end_hold_time, WEB_RTC_AEC_NL_WEIGHT_CURVE)
 res_psd_smooth=parameters.res_psd_smooth;
 near_psd_smooth=parameters.near_psd_smooth;
 ref_psd_smooth=parameters.ref_psd_smooth;

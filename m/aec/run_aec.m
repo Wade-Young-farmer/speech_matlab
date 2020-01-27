@@ -76,9 +76,9 @@ BAND_TABLE= [2, 8, 9, 18, 19, 47, 48, 124];
 BAND_TABLE=BAND_TABLE+1;
 
 tic;
-[total_input_f_pcm, indexs_1, indexs_2]=aec('input_data/test/aud_rec/rec_mic_0_0.pcm', 'input_data/test/aud_rec/rec_mic_1_0.pcm', 'input_data/test/aud_rec/rec_spk_l_0.pcm', filter_coeff, WEB_RTC_AEC_NL_WEIGHT_CURVE, DOUBLETALK_BAND_TABLE, BAND_TABLE);
+[total_input_f_pcm, indexs_1, indexs_2, a, b, c, d]=aec('input_data/rec_mic_0_0_short.pcm', 'input_data/rec_mic_1_0_short.pcm', 'input_data/rec_spk_l_0_short.pcm', filter_coeff, WEB_RTC_AEC_NL_WEIGHT_CURVE, DOUBLETALK_BAND_TABLE, BAND_TABLE);
 
-figure;
+figure(2);
 pcm_size = size(indexs_1, 2);
 scatter(1:pcm_size, indexs_1, 10, 'filled')
 hold on;
@@ -98,7 +98,7 @@ file_id=fopen('out_aec_0_0.pcm','wb');
 fwrite(file_id, out1,'int16');
 fclose(file_id);
 
-figure;
+figure(3);
 subplot(3,1,1);
 plot(out1);
 grid on;
@@ -108,6 +108,29 @@ colorbar;
 subplot(3,1,3);
 specgram(out2, 2048, 16000, 2048, 1024);
 colorbar;
+
+figure(4);
+fs=16000;
+aa = zeros(pcm_size * 128, 1);
+bb = zeros(pcm_size * 128, 1);
+cc = zeros(pcm_size * 128, 1);
+dd = zeros(pcm_size * 128, 1);
+for i = 1:pcm_size
+    aa((i-1)*128 + 1:i*128) = a(i);
+    bb((i-1)*128 + 1:i*128) = b(i);
+    cc((i-1)*128 + 1:i*128) = c(i);
+    dd((i-1)*128 + 1:i*128) = d(i);
+end
+t = (1:pcm_size * 128)/fs * 128;
+rrinSubSamp = out1;
+plot(t, rrinSubSamp/max(abs(rrinSubSamp)),'b');
+hold on;
+plot(t, aa, 'r');
+plot(t, bb, 'g');
+plot(t, cc, 'y');
+plot(t, dd, 'k');
+hold off;
+axis tight;
 % % Plot the STFT result
 % set(gcf, 'Position', [20 100 600 500]);
 % axes('Position', [0.1 0.1 0.85 0.5]);
